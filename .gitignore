@@ -1,0 +1,9 @@
+.idea
+logdir*
+*.py[cod]
+datasets
+.DS_Store
+outputs
+__*
+hparams/hparams.yaml
+tools
