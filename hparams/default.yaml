@@ -1,0 +1,32 @@
+---
+signal:
+    sr: 16000
+    frame_shift: 0.005
+    frame_length:  0.025
+    win_length: 400
+    hop_length: 80
+    n_fft: 512
+    n_mels: 80
+    max_db: 35
+    min_db: -55
+
+logdir_path: '/data/private/vc/logdir'
+
+train:
+    data_path: '/data/private/vc/datasets/timit/TIMIT/TRAIN/*/*/*.wav'
+
+    # model
+
+    # train
+    batch_size: 32
+    lr: 0.0003
+    num_epochs: 1000
+    steps_per_epoch: 100
+    save_per_epoch: 2
+    num_gpu: 2
+
+test:
+    data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
+
+    # test
+    batch_size: 32
