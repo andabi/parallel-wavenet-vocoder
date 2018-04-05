@@ -9,15 +9,25 @@ signal:
     n_mels: 80
     max_db: 35
     min_db: -55
-
+model:
+    dilations: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512,
+                  1, 2, 4, 8, 16, 32, 64, 128, 256, 512,
+                  1, 2, 4, 8, 16, 32, 64, 128, 256, 512,
+                  1, 2, 4, 8, 16, 32, 64, 128, 256, 512,
+                  1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+    filter_width: 2
+    residual_channels: 32
+    dilation_channels: 32
+    quantization_channels: 256
+    skip_channels: 512
+    use_biases: True
+    scalar_input: False
+    initial_filter_width: 32
+    n_iaf: 4
 logdir_path: '/data/private/vc/logdir'
 
 train:
     data_path: '/data/private/vc/datasets/timit/TIMIT/TRAIN/*/*/*.wav'
-
-    # model
-
-    # train
     batch_size: 32
     lr: 0.0003
     num_epochs: 1000
@@ -27,6 +37,4 @@ train:
 
 test:
     data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
-
-    # test
     batch_size: 32

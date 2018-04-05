@@ -30,7 +30,8 @@ class DataFlow(RNGDataFlow):
 
 
 def get_wav_and_melspec(wav_file):
-    # TODO trim?
+    # TODO trim
+    # TODO padding receptive field
     wav = read_wav(wav_file, sr=hp.signal.sr)
     melspec = wav2melspec_db(wav, sr=hp.signal.sr, n_fft=hp.signal.n_fft, win_length=hp.signal.win_length,
                              hop_length=hp.signal.hop_length, n_mels=hp.signal.n_mels,
