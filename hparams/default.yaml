@@ -9,6 +9,7 @@ signal:
     n_mels: 80
     max_db: 35
     min_db: -55
+    max_length: 32000
 model:
     dilations: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512,
                   1, 2, 4, 8, 16, 32, 64, 128, 256, 512,
@@ -21,20 +22,18 @@ model:
     quantization_channels: 256
     skip_channels: 512
     use_biases: True
-    scalar_input: False
     initial_filter_width: 32
     n_iaf: 4
 logdir_path: '/data/private/vc/logdir'
-
 train:
     data_path: '/data/private/vc/datasets/timit/TIMIT/TRAIN/*/*/*.wav'
     batch_size: 32
+    n_mix: 5
     lr: 0.0003
     num_epochs: 1000
     steps_per_epoch: 100
     save_per_epoch: 2
     num_gpu: 2
-
 test:
     data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
     batch_size: 32

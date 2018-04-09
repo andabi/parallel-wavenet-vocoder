@@ -6,10 +6,11 @@ import random
 
 from tensorpack.dataflow.base import RNGDataFlow
 from tensorpack.dataflow.common import BatchData
-from tensorpack.dataflow.prefetch import PrefetchData
+from tensorpack.dataflow import PrefetchData
 
-from audio import read_wav, wav2melspec_db
+from audio import read_wav, wav2melspec_db, trim_wav, fix_length
 from hparam import hparam as hp
+import numpy as np
 
 
 class DataFlow(RNGDataFlow):
@@ -30,10 +31,12 @@ class DataFlow(RNGDataFlow):
 
 
 def get_wav_and_melspec(wav_file):
-    # TODO trim
-    # TODO padding receptive field
     wav = read_wav(wav_file, sr=hp.signal.sr)
+    wav = trim_wav(wav)
+    wav = fix_length(wav, hp.signal.max_length)
+
     melspec = wav2melspec_db(wav, sr=hp.signal.sr, n_fft=hp.signal.n_fft, win_length=hp.signal.win_length,
                              hop_length=hp.signal.hop_length, n_mels=hp.signal.n_mels,
                              min_db=hp.signal.min_db, max_db=hp.signal.max_db)
+    wav = np.expand_dims(wav, -1)
     return wav, melspec

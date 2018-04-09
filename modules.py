@@ -1,67 +1,26 @@
 # -*- coding: utf-8 -*-
-# !/usr/bin/env python
+#!/usr/bin/env python
+
 
 import tensorflow as tf
-from hparam import hparam as hp
 import numpy as np
 
 
-class IAFVocoder(object):
-    def __init__(self, waveform, melspec, batch_size=hp.train.batch_size):
-        self.batch_size = batch_size
-        self.waveform = waveform  # (n, t)
-        self.melspec = melspec  # (n, t_mel, n_mel)
-
-    def __call__(self):
-        # Upsample melspec to fit to shape of waveform. (n, t_mel, n_mel) => (n, t, h)
-        _, t_mel, _ = self.melspec.get_shape().as_list()
-        stride1, stride2 = 10, 8
-        w1 = tf.get_variable('transposed_conv_1_weights',
-                             shape=(stride1, hp.model.quantization_channels // 2, hp.signal_n_mel))
-        condition = tf.nn.conv1d_transpose(self.melspec, w1, output_shape=(
-            self.batch_size, stride1 * t_mel, hp.model.quantization_channels // 2), stride=stride1)
-        w2 = tf.get_variable('transposed_conv_2_weights',
-                             shape=(stride2, hp.model.quantization_channels, hp.model.quantization_channels // 2))
-        condition = tf.nn.conv1d_transpose(condition, w2, output_shape=(
-            self.batch_size, stride2 * t_mel, hp.model.quantization_channels), stride=stride2)  # (n, t, h)
-
-        # Sample from unit gaussian.
-        input = tf.py_func(np.random.normal, [tf.tile(tf.zeros_like(self.waveform),
-                                                      [1, 1, hp.model.quantization_channels])],
-                           [tf.double])  # (n, t, h)
-        input = tf.to_float(input)
-
-        for _ in range(hp.model.n_iaf):
-            iaf = IAFLayer()
-            input = iaf(input, condition)
-        out = tf.squeeze(tf.layers.dense(input, 1), squeeze_dims=[-1])  # (n, t)
-        return out
-
-
 class IAFLayer(object):
-    def __init__(self, batch_size=hp.train.batch_size):
+    def __init__(self, batch_size, n_hidden_units, ar_model):
         self.batch_size = batch_size
+        self.n_hidden_units = n_hidden_units
+        self.ar_model = ar_model
 
-    # Network
+    # network
     def __call__(self, input, condition):
-        # input = (n, t, h), condition = (n, t, h)
-        ar_model = WaveNetModel(
-            batch_size=self.batch_size,
-            dilations=hp.model.dilations,
-            filter_width=hp.model.filter_width,
-            residual_channels=hp.model.residual_channels,
-            dilation_channels=hp.model.dilation_channels,
-            quantization_channels=hp.model.quantization_channels,
-            skip_channels=hp.model.skip_channels,
-            use_biases=hp.model.use_biases,
-            scalar_input=hp.model.scalar_input,
-            initial_filter_width=hp.model.initial_filter_width,
-            condition_channels=hp.signal.n_mels)
-
-        ar_model = ar_model(input, condition)
-        ar_model = tf.layers.dense(ar_model, 2 * hp.model.quantization_channels)  # (n, t, 2h)
-        mean = ar_model[..., :hp.model.quantization_channels]  # (n, t, h)
-        scale = ar_model[..., hp.model.quantization_channels:]  # (n, t, h)
+        '''
+        input = (n, t, h), condition = (n, t, h)
+        '''
+        out = self.ar_model(input, condition)
+        out = tf.layers.dense(out, 2 * self.n_hidden_units)  # (n, t, 2h)
+        mean = out[..., :self.n_hidden_units]  # (n, t, h)
+        scale = out[..., self.n_hidden_units:]  # (n, t, h)
         out = input * scale + mean
         return out
 
@@ -118,7 +77,8 @@ def causal_conv(value, filter_, dilation, name='causal_conv'):
         return result
 
 
-class WaveNetModel(object):
+# Renovated from https://github.com/ibab/tensorflow-wavenet
+class WaveNet(object):
     '''Implements the WaveNet network for generative audio.
 
     Usage (with the architecture as in the DeepMind paper):
@@ -141,9 +101,7 @@ class WaveNetModel(object):
                  skip_channels,
                  quantization_channels=2 ** 8,
                  use_biases=False,
-                 scalar_input=False,
                  initial_filter_width=32,
-                 histograms=False,
                  condition_channels=None):
         '''Initializes the WaveNet model.
 
@@ -163,14 +121,6 @@ class WaveNetModel(object):
                 Default: 256 (8-bit quantization).
             use_biases: Whether to add a bias layer to each convolution.
                 Default: False.
-            scalar_input: Whether to use the quantized waveform directly as
-                input to the network instead of one-hot encoding it.
-                Default: False.
-            initial_filter_width: The width of the initial filter of the
-                convolution applied to the scalar input. This is only relevant
-                if scalar_input=True.
-            histograms: Whether to store histograms in the summary.
-                Default: False.
             condition_channels: Number of channels in (embedding
                 size) of global conditioning vector. None indicates there is
                 no global conditioning.
@@ -183,27 +133,20 @@ class WaveNetModel(object):
         self.quantization_channels = quantization_channels
         self.use_biases = use_biases
         self.skip_channels = skip_channels
-        self.scalar_input = scalar_input
         self.initial_filter_width = initial_filter_width
-        self.histograms = histograms
         self.condition_channels = condition_channels
 
-        self.receptive_field = WaveNetModel.calculate_receptive_field(
-            self.filter_width, self.dilations, self.scalar_input,
-            self.initial_filter_width)
+        self.receptive_field = WaveNet.calculate_receptive_field(
+            self.filter_width, self.dilations)
         self.variables = self._create_variables()
 
     def __call__(self, *args):
         return self._create_network(*args)
 
     @staticmethod
-    def calculate_receptive_field(filter_width, dilations, scalar_input,
-                                  initial_filter_width):
+    def calculate_receptive_field(filter_width, dilations):
         receptive_field = (filter_width - 1) * sum(dilations) + 1
-        if scalar_input:
-            receptive_field += initial_filter_width - 1
-        else:
-            receptive_field += filter_width - 1
+        receptive_field += filter_width - 1
         return receptive_field
 
     def _create_variables(self):
@@ -216,12 +159,8 @@ class WaveNetModel(object):
         with tf.variable_scope('wavenet'):
             with tf.variable_scope('causal_layer'):
                 layer = dict()
-                if self.scalar_input:
-                    initial_channels = 1
-                    initial_filter_width = self.initial_filter_width
-                else:
-                    initial_channels = self.quantization_channels
-                    initial_filter_width = self.filter_width
+                initial_channels = self.quantization_channels
+                initial_filter_width = self.filter_width
                 layer['filter'] = create_variable(
                     'filter',
                     [initial_filter_width,
@@ -386,18 +325,6 @@ class WaveNetModel(object):
             transformed = transformed + dense_bias
             skip_contribution = skip_contribution + skip_bias
 
-        if self.histograms:
-            layer = 'layer{}'.format(layer_index)
-            tf.histogram_summary(layer + '_filter', weights_filter)
-            tf.histogram_summary(layer + '_gate', weights_gate)
-            tf.histogram_summary(layer + '_dense', weights_dense)
-            tf.histogram_summary(layer + '_skip', weights_skip)
-            if self.use_biases:
-                tf.histogram_summary(layer + '_biases_filter', filter_bias)
-                tf.histogram_summary(layer + '_biases_gate', gate_bias)
-                tf.histogram_summary(layer + '_biases_dense', dense_bias)
-                tf.histogram_summary(layer + '_biases_skip', skip_bias)
-
         input_cut = tf.shape(input_batch)[1] - tf.shape(transformed)[1]
         input_batch = tf.slice(input_batch, [0, input_cut, 0], [-1, -1, -1])
 
@@ -461,15 +388,14 @@ class WaveNetModel(object):
         return skip_contribution, input_batch + transformed
 
     def _create_network(self, input_batch, condition_batch):
+        input_batch = tf.pad(input_batch, [[0, 0], [self.receptive_field, 0], [0, 0]])
+
         '''Construct the WaveNet network.'''
         outputs = []
         current_layer = input_batch
 
         # Pre-process the input with a regular convolution
-        if self.scalar_input:
-            initial_channels = 1
-        else:
-            initial_channels = self.quantization_channels
+        initial_channels = self.quantization_channels
 
         current_layer = self._create_causal_layer(current_layer)
 
@@ -492,13 +418,6 @@ class WaveNetModel(object):
             if self.use_biases:
                 b1 = self.variables['postprocessing']['postprocess1_bias']
                 b2 = self.variables['postprocessing']['postprocess2_bias']
-
-            if self.histograms:
-                tf.histogram_summary('postprocess1_weights', w1)
-                tf.histogram_summary('postprocess2_weights', w2)
-                if self.use_biases:
-                    tf.histogram_summary('postprocess1_biases', b1)
-                    tf.histogram_summary('postprocess2_biases', b2)
 
             # We skip connections from the outputs of each layer, adding them
             # all up here.
@@ -637,11 +556,7 @@ class WaveNetModel(object):
         If you want to generate audio by feeding the output of the network back
         as an input, see predict_proba_incremental for a faster alternative.'''
         with tf.name_scope(name):
-            if self.scalar_input:
-                encoded = tf.cast(waveform, tf.float32)
-                encoded = tf.reshape(encoded, [-1, 1])
-            else:
-                encoded = self._one_hot(waveform)
+            encoded = self._one_hot(waveform)
 
             gc_embedding = self._embed_gc(condition)
             raw_output = self._create_network(encoded, gc_embedding)
@@ -663,9 +578,6 @@ class WaveNetModel(object):
         if self.filter_width > 2:
             raise NotImplementedError("Incremental generation does not "
                                       "support filter_width > 2.")
-        if self.scalar_input:
-            raise NotImplementedError("Incremental generation does not "
-                                      "support scalar input yet.")
         with tf.name_scope(name):
             encoded = tf.one_hot(waveform, self.quantization_channels)
             encoded = tf.reshape(encoded, [-1, self.quantization_channels])
@@ -679,3 +591,162 @@ class WaveNetModel(object):
                 [tf.shape(proba)[0] - 1, 0],
                 [1, self.quantization_channels])
             return tf.reshape(last, [-1])
+
+
+def normalize(inputs,
+              type="bn",
+              decay=.999,
+              epsilon=1e-8,
+              is_training=True,
+              reuse=None,
+              activation_fn=None,
+              scope="normalize"):
+    '''Applies {batch|layer} normalization.
+
+    Args:
+      inputs: A tensor with 2 or more dimensions, where the first dimension has
+        `batch_size`. If type is `bn`, the normalization is over all but 
+        the last dimension. Or if type is `ln`, the normalization is over 
+        the last dimension. Note that this is different from the native 
+        `tf.contrib.layers.batch_norm`. For this I recommend you change
+        a line in ``tensorflow/contrib/layers/python/layers/layer.py` 
+        as follows.
+        Before: mean, variance = nn.moments(inputs, axis, keep_dims=True)
+        After: mean, variance = nn.moments(inputs, [-1], keep_dims=True)
+      type: A string. Either "bn" or "ln".
+      decay: Decay for the moving average. Reasonable values for `decay` are close
+        to 1.0, typically in the multiple-nines range: 0.999, 0.99, 0.9, etc.
+        Lower `decay` value (recommend trying `decay`=0.9) if model experiences
+        reasonably good training performance but poor validation and/or test
+        performance.
+      is_training: Whether or not the layer is in training mode. W
+      activation_fn: Activation function.
+      scope: Optional scope for `variable_scope`.
+
+    Returns:
+      A tensor with the same shape and data dtype as `inputs`.
+    '''
+    if type == "bn":
+        inputs_shape = inputs.get_shape()
+        inputs_rank = inputs_shape.ndims
+
+        # use fused batch norm if inputs_rank in [2, 3, 4] as it is much faster.
+        # pay attention to the fact that fused_batch_norm requires shape to be rank 4 of NHWC.
+        if inputs_rank in [2, 3, 4]:
+            if inputs_rank == 2:
+                inputs = tf.expand_dims(inputs, axis=1)
+                inputs = tf.expand_dims(inputs, axis=2)
+            elif inputs_rank == 3:
+                inputs = tf.expand_dims(inputs, axis=1)
+
+            outputs = tf.contrib.layers.batch_norm(inputs=inputs,
+                                                   decay=decay,
+                                                   center=True,
+                                                   scale=True,
+                                                   updates_collections=None,
+                                                   is_training=is_training,
+                                                   scope=scope,
+                                                   zero_debias_moving_mean=True,
+                                                   fused=True,
+                                                   reuse=reuse)
+            # restore original shape
+            if inputs_rank == 2:
+                outputs = tf.squeeze(outputs, axis=[1, 2])
+            elif inputs_rank == 3:
+                outputs = tf.squeeze(outputs, axis=1)
+        else:  # fallback to naive batch norm
+            outputs = tf.contrib.layers.batch_norm(inputs=inputs,
+                                                   decay=decay,
+                                                   center=True,
+                                                   scale=True,
+                                                   updates_collections=None,
+                                                   is_training=is_training,
+                                                   scope=scope,
+                                                   reuse=reuse,
+                                                   fused=False)
+    elif type in ("ln", "ins"):
+        reduction_axis = -1 if type == "ln" else 1
+        with tf.variable_scope(scope, reuse=reuse):
+            inputs_shape = inputs.get_shape()
+            params_shape = inputs_shape[-1:]
+
+            mean, variance = tf.nn.moments(inputs, [reduction_axis], keep_dims=True)
+            # beta = tf.Variable(tf.zeros(params_shape))
+            beta = tf.get_variable("beta", shape=params_shape, initializer=tf.zeros_initializer)
+            # gamma = tf.Variable(tf.ones(params_shape))
+            gamma = tf.get_variable("gamma", shape=params_shape, initializer=tf.ones_initializer)
+            normalized = (inputs - mean) / ((variance + epsilon) ** (.5))
+            outputs = gamma * normalized + beta
+    else:
+        outputs = inputs
+
+    if activation_fn:
+        outputs = activation_fn(outputs)
+
+    return outputs
+
+
+def discretizsed_mol_loss(out, y, n_mix, is_training, n_classes=256, weight_reg=0.):
+    '''
+    
+    :param out: (b, t, h)
+    :param y: (b, t, 1)
+    :param n_mix: 
+    :return: 
+    '''
+    _, n_timesteps, _ = y.get_shape().as_list()
+    out = tf.layers.dense(out, n_mix * 3, bias_initializer=tf.random_uniform_initializer(minval=-3., maxval=3.))  # (b, t, 3n)
+
+    mu = out[..., :n_mix]
+    mu = tf.nn.sigmoid(mu)  # (b, t, n)
+
+    log_var = out[..., n_mix: 2 * n_mix]
+    # TODO softplus
+    log_var = tf.maximum(log_var, -7.0)  # (b, t, n)
+
+    log_pi = out[..., 2 * n_mix: 3 * n_mix]  # (b, t, n)
+    # TODO safer softmax, any idea?
+    log_pi = normalize(log_pi, type='ins', is_training=is_training, scope='normalize_pi')
+    log_pi = tf.nn.log_softmax(log_pi)
+
+    # (b, t, 1) => (b, t, n)
+    y = tf.tile(y, [1, 1, n_mix])
+
+    centered_x = y - mu
+    inv_stdv = tf.exp(-log_var)
+    plus_in = inv_stdv * (centered_x + 1 / n_classes)
+    min_in = inv_stdv * (centered_x - 1 / n_classes)
+    cdf_plus = tf.sigmoid(plus_in)
+    cdf_min = tf.sigmoid(min_in)
+
+    # log probability for edge case
+    log_cdf_plus = plus_in - tf.nn.softplus(plus_in)
+    log_one_minus_cdf_min = -tf.nn.softplus(min_in)
+
+    # probability for all other cases
+    cdf_delta = cdf_plus - cdf_min
+
+    log_prob = tf.where(y < 0.001, log_cdf_plus,
+                        tf.where(y > 0.999, log_one_minus_cdf_min, tf.log(tf.maximum(cdf_delta, 1e-12))))
+
+    # tf.summary.histogram('net2/train/prob', tf.exp(log_prob))
+
+    log_prob = log_prob + log_pi
+
+    # tf.summary.histogram('net2/prob_max', tf.reduce_max(tf.exp(log_prob), axis=-1))
+
+    log_prob = tf.reduce_logsumexp(log_prob, axis=-1)
+
+    loss_mle = -tf.reduce_mean(log_prob)
+
+    # regularize keeping modals away from each other
+    mean = tf.reduce_sum(mu * log_pi, axis=-1, keepdims=True)
+    loss_reg = tf.reduce_sum(log_pi * tf.squared_difference(mu, mean), axis=-1)
+    loss_reg = -tf.reduce_mean(loss_reg)
+
+    loss = loss_mle + weight_reg * loss_reg
+
+    # tf.summary.scalar('net2/train/loss_mle', loss_mle)
+    # tf.summary.scalar('net2/train/loss_mix', loss_mix)
+
+    return loss
