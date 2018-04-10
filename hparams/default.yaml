@@ -22,7 +22,6 @@ model:
     quantization_channels: 256
     skip_channels: 512
     use_biases: True
-    initial_filter_width: 32
     n_iaf: 4
 logdir_path: '/data/private/vc/logdir'
 train:
@@ -33,7 +32,7 @@ train:
     num_epochs: 1000
     steps_per_epoch: 100
     save_per_epoch: 2
-    num_gpu: 2
+    num_gpu: 1
 test:
     data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
     batch_size: 32

@@ -10,7 +10,7 @@ from tensorpack.callbacks.saver import ModelSaver
 from tensorpack.tfutils.sessinit import SaverRestore
 from tensorpack.train.interface import TrainConfig
 from tensorpack.train.interface import launch_train_with_config
-from tensorpack.train.trainers import SyncMultiGPUTrainerReplicated
+from tensorpack.train.trainers import SyncMultiGPUTrainerReplicated, SimpleTrainer
 from tensorpack.utils import logger
 from tensorpack.input_source.input_source import QueueInput
 from data_load import DataFlow
@@ -18,6 +18,7 @@ from hparam import hparam as hp
 from models import IAFVocoder
 import tensorflow as tf
 import fire
+# tf.enable_eager_execution()
 
 
 def train(case='default', ckpt=None, gpu=None):
@@ -38,11 +39,6 @@ def train(case='default', ckpt=None, gpu=None):
     # set logger for event and model saver
     logger.set_logger_dir(hp.logdir)
 
-    session_conf = tf.ConfigProto(
-        gpu_options=tf.GPUOptions(
-            allow_growth=True,
-        ),)
-
     train_conf = TrainConfig(
         model=model,
         data=QueueInput(df(n_prefetch=1000, n_thread=4)),
@@ -52,7 +48,6 @@ def train(case='default', ckpt=None, gpu=None):
         ],
         max_epoch=hp.train.num_epochs,
         steps_per_epoch=hp.train.steps_per_epoch,
-        # session_config=session_conf
     )
     ckpt = '{}/{}'.format(hp.logdir, ckpt) if ckpt else tf.train.latest_checkpoint(hp.logdir)
     if ckpt:
@@ -62,7 +57,10 @@ def train(case='default', ckpt=None, gpu=None):
         os.environ['CUDA_VISIBLE_DEVICES'] = gpu
         train_conf.nr_tower = len(gpu.split(','))
 
-    trainer = SyncMultiGPUTrainerReplicated(hp.train.num_gpu)
+    if hp.train.num_gpu <= 1:
+        trainer = SimpleTrainer()
+    else:
+        trainer = SyncMultiGPUTrainerReplicated(gpus=hp.train.num_gpu)
 
     launch_train_with_config(train_conf, trainer=trainer)
 
