@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-#!/usr/bin/env python
+# !/usr/bin/env python
 
 from __future__ import print_function
 
-import multiprocessing
 import os
 
 from tensorpack.callbacks.saver import ModelSaver
@@ -18,17 +17,21 @@ from hparam import hparam as hp
 from models import IAFVocoder
 import tensorflow as tf
 import fire
-# tf.enable_eager_execution()
+from utils import remove_all_files
 
 
-def train(case='default', ckpt=None, gpu=None):
+def train(case='default', ckpt=None, gpu=None, r=False):
     '''
     :param case: experiment case name
     :param ckpt: checkpoint to load model
     :param gpu: comma separated list of GPU(s) to use
+    :param r: start from the beginning.
     :return: 
     '''
+
     hp.set_hparam_yaml(case)
+    if r:
+        remove_all_files(hp.logdir)
 
     # model
     model = IAFVocoder(batch_size=hp.train.batch_size)
@@ -48,6 +51,12 @@ def train(case='default', ckpt=None, gpu=None):
         ],
         max_epoch=hp.train.num_epochs,
         steps_per_epoch=hp.train.steps_per_epoch,
+        # session_config=tf.ConfigProto(
+        #     gpu_options=tf.GPUOptions(
+                # allow_growth=True,
+                # per_process_gpu_memory_fraction=0.4
+        #     )
+        # )
     )
     ckpt = '{}/{}'.format(hp.logdir, ckpt) if ckpt else tf.train.latest_checkpoint(hp.logdir)
     if ckpt:

@@ -1,0 +1,8 @@
+tensorflow >= 1.4
+numpy >= 1.11.1
+librosa == 0.5.1
+tensorpack >= 0.8.5
+pyyaml
+soundfile
+pydub
+fire

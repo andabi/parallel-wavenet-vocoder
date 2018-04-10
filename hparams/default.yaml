@@ -11,28 +11,25 @@ signal:
     min_db: -55
     max_length: 32000
 model:
-    dilations: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512,
-                  1, 2, 4, 8, 16, 32, 64, 128, 256, 512,
-                  1, 2, 4, 8, 16, 32, 64, 128, 256, 512,
-                  1, 2, 4, 8, 16, 32, 64, 128, 256, 512,
-                  1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+    dilations: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+#                  1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
     filter_width: 2
     residual_channels: 32
     dilation_channels: 32
-    quantization_channels: 256
-    skip_channels: 512
+    quantization_channels: 128
+    skip_channels: 256
     use_biases: True
-    n_iaf: 4
-logdir_path: '/data/private/vc/logdir'
+    n_iaf: 2
+logdir_path: '/data/private/iaf-vocoder/logdir'
 train:
-    data_path: '/data/private/vc/datasets/timit/TIMIT/TRAIN/*/*/*.wav'
-    batch_size: 32
+    data_path: '/data/public/rw/LJSpeech-1.0_processed/*.wav'
+    batch_size: 8
     n_mix: 5
     lr: 0.0003
-    num_epochs: 1000
+    num_epochs: 100000
     steps_per_epoch: 100
-    save_per_epoch: 2
-    num_gpu: 1
+    save_per_epoch: 50
+    num_gpu: 8
 test:
-    data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
+    data_path: '/data/public/rw/LJSpeech-1.0_processed/*.wav'
     batch_size: 32

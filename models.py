@@ -6,7 +6,7 @@ from tensorpack.graph_builder.model_desc import ModelDesc, InputDesc
 from tensorpack.tfutils.scope_utils import auto_reuse_variable_scope
 
 from hparam import hparam as hp
-from modules import IAFLayer, WaveNet, discretizsed_mol_loss
+from modules import IAFLayer, WaveNet, discretizsed_mol_loss, l2_loss
 
 
 class IAFVocoder(ModelDesc):
@@ -23,6 +23,10 @@ class IAFVocoder(ModelDesc):
         wav, melspec = inputs
         out = self(*inputs)
         self.cost = discretizsed_mol_loss(out=out, y=wav, n_mix=hp.train.n_mix)
+        # self.cost = l2_loss(out=out, y=wav)
+
+        # summaries
+        tf.summary.scalar('loss', self.cost)
 
     def _get_optimizer(self):
         lr = tf.get_variable('learning_rate', initializer=hp.train.lr, trainable=False)
@@ -63,11 +67,7 @@ class IAFVocoder(ModelDesc):
                 condition = self._upsample_mel(melspec)
 
             # Sample from unit gaussian.
-            # input = tf.tile(tf.zeros_like(wav), [1, 1, hp.model.quantization_channels])
-            # input = tf.py_func(np.random.normal, [input], [tf.double])  # (n, t, h)
-            # input = tf.to_float(input)
-            input = tf.random_normal(shape=(self.batch_size, hp.signal.max_length, hp.model.quantization_channels))
-
+            input = tf.random_normal(shape=(self.batch_size, hp.signal.max_length, hp.model.quantization_channels))  # (n, t, h)
             for i in range(hp.model.n_iaf):
                 with tf.variable_scope('iaf{}'.format(i)):
                     ar_model = WaveNet(
@@ -83,6 +83,4 @@ class IAFVocoder(ModelDesc):
                     iaf = IAFLayer(batch_size=hp.train.batch_size, n_hidden_units=hp.model.quantization_channels,
                                    ar_model=ar_model)
                     input = iaf(input, condition)  # (n, t, h)
-
-            out = tf.layers.dense(input, units=1)  # (n, t, 1)
-            return out
+        return input

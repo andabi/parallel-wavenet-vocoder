@@ -668,6 +668,12 @@ def normalize(inputs,
     return outputs
 
 
+def l2_loss(out, y):
+    out = tf.layers.dense(out, units=1)  # (n, t, 1)
+    loss = tf.squared_difference(out, y)
+    return loss
+
+
 def discretizsed_mol_loss(out, y, n_mix, n_classes=256, weight_reg=0.):
     '''
     
