@@ -22,8 +22,11 @@ class IAFVocoder(ModelDesc):
     def _build_graph(self, inputs):
         wav, melspec = inputs
         out = self(*inputs)
-        self.cost = discretizsed_mol_loss(out=out, y=wav, n_mix=hp.train.n_mix)
+        self.cost, mu, log_var, log_pi = discretizsed_mol_loss(out=out, y=wav, n_mix=hp.train.n_mix)
         # self.cost = l2_loss(out=out, y=wav)
+
+        # build graph for generation phase.
+        self.generate(mu, log_pi)
 
         # summaries
         tf.summary.scalar('loss', self.cost)
@@ -58,6 +61,11 @@ class IAFVocoder(ModelDesc):
                                shape=[-1, self.t_mel * hp.signal.hop_length, hp.signal.n_mels])
         condition = condition[:, hp.signal.hop_length // 2: -hp.signal.hop_length // 2, :]
         return condition
+
+    def generate(self, mu, log_pi):
+        argmax = tf.one_hot(tf.argmax(log_pi, axis=-1), hp.train.n_mix)
+        pred = tf.reduce_sum(mu * argmax, axis=-1, name='pred_wav')
+        return pred
 
     @auto_reuse_variable_scope
     # network

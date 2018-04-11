@@ -24,26 +24,26 @@ class IAFLayer(object):
         return out
 
 
-def time_to_batch(value, dilation, name=None):
-    with tf.name_scope('time_to_batch'):
-        shape = tf.shape(value)
-        pad_elements = dilation - 1 - (shape[1] + dilation - 1) % dilation
-        padded = tf.pad(value, [[0, 0], [0, pad_elements], [0, 0]])
-        reshaped = tf.reshape(padded, [-1, dilation, shape[2]])
-        transposed = tf.transpose(reshaped, perm=[1, 0, 2])
-        return tf.reshape(transposed, [shape[0] * dilation, -1, shape[2]])
-
-
-def batch_to_time(value, dilation, name=None):
-    with tf.name_scope('batch_to_time'):
-        shape = tf.shape(value)
-        prepared = tf.reshape(value, [dilation, -1, shape[2]])
-        transposed = tf.transpose(prepared, perm=[1, 0, 2])
-        return tf.reshape(transposed,
-                          [tf.div(shape[0], dilation), -1, shape[2]])
-
-
+# TODO generalize: padding valid => same, no slice
 def causal_conv(value, filter_, dilation, name='causal_conv'):
+
+    def time_to_batch(value, dilation, name=None):
+        with tf.name_scope('time_to_batch'):
+            shape = tf.shape(value)
+            pad_elements = dilation - 1 - (shape[1] + dilation - 1) % dilation
+            padded = tf.pad(value, [[0, 0], [0, pad_elements], [0, 0]])
+            reshaped = tf.reshape(padded, [-1, dilation, shape[2]])
+            transposed = tf.transpose(reshaped, perm=[1, 0, 2])
+            return tf.reshape(transposed, [shape[0] * dilation, -1, shape[2]])
+
+    def batch_to_time(value, dilation, name=None):
+        with tf.name_scope('batch_to_time'):
+            shape = tf.shape(value)
+            prepared = tf.reshape(value, [dilation, -1, shape[2]])
+            transposed = tf.transpose(prepared, perm=[1, 0, 2])
+            return tf.reshape(transposed,
+                              [tf.div(shape[0], dilation), -1, shape[2]])
+
     with tf.name_scope(name):
         filter_width = tf.shape(filter_)[0]
         if dilation > 1:
@@ -359,223 +359,6 @@ class WaveNet(object):
 
         return skip_contribution, input_batch + transformed
 
-        # def _generator_conv(self, input_batch, state_batch, weights):
-        #     '''Perform convolution for a single convolutional processing step.'''
-        #     # TODO generalize to filter_width > 2
-        #     past_weights = weights[0, :, :]
-        #     curr_weights = weights[1, :, :]
-        #     output = tf.matmul(state_batch, past_weights) + tf.matmul(
-        #         input_batch, curr_weights)
-        #     return output
-        #
-        # def _generator_causal_layer(self, input_batch, state_batch):
-        #     with tf.name_scope('causal_layer'):
-        #         weights_filter = self.variables['causal_layer']['filter']
-        #         output = self._generator_conv(
-        #             input_batch, state_batch, weights_filter)
-        #     return output
-        #
-        # def _generator_dilation_layer(self, input_batch, state_batch, layer_index,
-        #                               dilation, condition_batch):
-        #     variables = self.variables['dilated_stack'][layer_index]
-        #
-        #     weights_filter = variables['filter']
-        #     weights_gate = variables['gate']
-        #     output_filter = self._generator_conv(
-        #         input_batch, state_batch, weights_filter)
-        #     output_gate = self._generator_conv(
-        #         input_batch, state_batch, weights_gate)
-        #
-        #     if condition_batch is not None:
-        #         condition_batch = tf.reshape(condition_batch,
-        #                                      shape=(1, -1))
-        #         weights_gc_filter = variables['cond_filtweights']
-        #         weights_gc_filter = weights_gc_filter[0, :, :]
-        #         output_filter += tf.matmul(condition_batch,
-        #                                    weights_gc_filter)
-        #         weights_gc_gate = variables['cond_gateweights']
-        #         weights_gc_gate = weights_gc_gate[0, :, :]
-        #         output_gate += tf.matmul(condition_batch,
-        #                                  weights_gc_gate)
-        #
-        #     if self.use_biases:
-        #         output_filter = output_filter + variables['filter_bias']
-        #         output_gate = output_gate + variables['gate_bias']
-        #
-        #     out = tf.tanh(output_filter) * tf.sigmoid(output_gate)
-        #
-        #     weights_dense = variables['dense']
-        #     transformed = tf.matmul(out, weights_dense[0, :, :])
-        #     if self.use_biases:
-        #         transformed = transformed + variables['dense_bias']
-        #
-        #     weights_skip = variables['skip']
-        #     skip_contribution = tf.matmul(out, weights_skip[0, :, :])
-        #     if self.use_biases:
-        #         skip_contribution = skip_contribution + variables['skip_bias']
-        #
-        #     return skip_contribution, input_batch + transformed
-
-
-        # def _create_generator(self, input_batch, condition_batch):
-        #     '''Construct an efficient incremental generator.'''
-        #     init_ops = []
-        #     push_ops = []
-        #     outputs = []
-        #     current_layer = input_batch
-        #
-        #     q = tf.FIFOQueue(
-        #         1,
-        #         dtypes=tf.float32,
-        #         shapes=(self.batch_size, self.quantization_channels))
-        #     init = q.enqueue_many(
-        #         tf.zeros((1, self.batch_size, self.quantization_channels)))
-        #
-        #     current_state = q.dequeue()
-        #     push = q.enqueue([current_layer])
-        #     init_ops.append(init)
-        #     push_ops.append(push)
-        #
-        #     current_layer = self._generator_causal_layer(
-        #         current_layer, current_state)
-        #
-        #     # Add all defined dilation layers.
-        #     with tf.name_scope('dilated_stack'):
-        #         for layer_index, dilation in enumerate(self.dilations):
-        #             with tf.name_scope('layer{}'.format(layer_index)):
-        #                 q = tf.FIFOQueue(
-        #                     dilation,
-        #                     dtypes=tf.float32,
-        #                     shapes=(self.batch_size, self.residual_channels))
-        #                 init = q.enqueue_many(
-        #                     tf.zeros((dilation, self.batch_size,
-        #                               self.residual_channels)))
-        #
-        #                 current_state = q.dequeue()
-        #                 push = q.enqueue([current_layer])
-        #                 init_ops.append(init)
-        #                 push_ops.append(push)
-        #
-        #                 output, current_layer = self._generator_dilation_layer(
-        #                     current_layer, current_state, layer_index, dilation,
-        #                     condition_batch)
-        #                 outputs.append(output)
-        #     self.init_ops = init_ops
-        #     self.push_ops = push_ops
-        #
-        #     with tf.name_scope('postprocessing'):
-        #         variables = self.variables['postprocessing']
-        #         # Perform (+) -> ReLU -> 1x1 conv -> ReLU -> 1x1 conv to
-        #         # postprocess the output.
-        #         w1 = variables['postprocess1']
-        #         w2 = variables['postprocess2']
-        #         if self.use_biases:
-        #             b1 = variables['postprocess1_bias']
-        #             b2 = variables['postprocess2_bias']
-        #
-        #         # We skip connections from the outputs of each layer, adding them
-        #         # all up here.
-        #         total = sum(outputs)
-        #         transformed1 = tf.nn.relu(total)
-        #
-        #         conv1 = tf.matmul(transformed1, w1[0, :, :])
-        #         if self.use_biases:
-        #             conv1 = conv1 + b1
-        #         transformed2 = tf.nn.relu(conv1)
-        #         conv2 = tf.matmul(transformed2, w2[0, :, :])
-        #         if self.use_biases:
-        #             conv2 = conv2 + b2
-        #
-        #     return conv2
-        #
-        # def _one_hot(self, input_batch):
-        #     '''One-hot encodes the waveform amplitudes.
-        #
-        #     This allows the definition of the network as a categorical distribution
-        #     over a finite set of possible amplitudes.
-        #     '''
-        #     with tf.name_scope('one_hot_encode'):
-        #         encoded = tf.one_hot(
-        #             input_batch,
-        #             depth=self.quantization_channels,
-        #             dtype=tf.float32)
-        #         shape = [self.batch_size, -1, self.quantization_channels]
-        #         encoded = tf.reshape(encoded, shape)
-        #     return encoded
-        #
-        # def _embed_gc(self, condition):
-        #     '''Returns embedding for global condition.
-        #     :param condition: Either ID of global condition for
-        #            tf.nn.embedding_lookup or actual embedding. The latter is
-        #            experimental.
-        #     :return: Embedding or None
-        #     '''
-        #     embedding = None
-        #     if condition is not None:
-        #         # ... else the condition (if any) is already provided
-        #         # as an embedding.
-        #
-        #         # In this case, the number of global_embedding channels must be
-        #         # equal to the the last dimension of the condition tensor.
-        #         gc_batch_rank = len(condition.get_shape())
-        #         dims_match = (condition.get_shape()[gc_batch_rank - 1] ==
-        #                       self.condition_channels)
-        #         if not dims_match:
-        #             raise ValueError('Shape of condition {} does not'
-        #                              ' match condition_channels {}.'.
-        #                              format(condition.get_shape(),
-        #                                     self.condition_channels))
-        #         embedding = condition
-        #
-        #     if embedding is not None:
-        #         embedding = tf.reshape(
-        #             embedding,
-        #             [self.batch_size, 1, self.condition_channels])
-        #
-        #     return embedding
-
-        # def predict_proba(self, waveform, condition=None, name='wavenet'):
-        #     '''Computes the probability distribution of the next sample based on
-        #     all samples in the input waveform.
-        #     If you want to generate audio by feeding the output of the network back
-        #     as an input, see predict_proba_incremental for a faster alternative.'''
-        #     with tf.name_scope(name):
-        #         encoded = self._one_hot(waveform)
-        #
-        #         gc_embedding = self._embed_gc(condition)
-        #         raw_output = self(encoded, gc_embedding)
-        #         out = tf.reshape(raw_output, [-1, self.quantization_channels])
-        #         # Cast to float64 to avoid bug in TensorFlow
-        #         proba = tf.cast(
-        #             tf.nn.softmax(tf.cast(out, tf.float64)), tf.float32)
-        #         last = tf.slice(
-        #             proba,
-        #             [tf.shape(proba)[0] - 1, 0],
-        #             [1, self.quantization_channels])
-        #         return tf.reshape(last, [-1])
-        #
-        # def predict_proba_incremental(self, waveform, condition=None,
-        #                               name='wavenet'):
-        #     '''Computes the probability distribution of the next sample
-        #     incrementally, based on a single sample and all previously passed
-        #     samples.'''
-        #     if self.filter_width > 2:
-        #         raise NotImplementedError("Incremental generation does not "
-        #                                   "support filter_width > 2.")
-        #     with tf.name_scope(name):
-        #         encoded = tf.one_hot(waveform, self.quantization_channels)
-        #         encoded = tf.reshape(encoded, [-1, self.quantization_channels])
-        #         gc_embedding = self._embed_gc(condition)
-        #         raw_output = self._create_generator(encoded, gc_embedding)
-        #         out = tf.reshape(raw_output, [-1, self.quantization_channels])
-        #         proba = tf.cast(
-        #             tf.nn.softmax(tf.cast(out, tf.float64)), tf.float32)
-        #         last = tf.slice(
-        #             proba,
-        #             [tf.shape(proba)[0] - 1, 0],
-        #             [1, self.quantization_channels])
-        #         return tf.reshape(last, [-1])
-
 
 def normalize(inputs,
               type="bn",
@@ -671,10 +454,11 @@ def normalize(inputs,
 def l2_loss(out, y):
     out = tf.layers.dense(out, units=1)  # (n, t, 1)
     loss = tf.squared_difference(out, y)
+    loss = tf.reduce_mean(loss)
     return loss
 
 
-def discretizsed_mol_loss(out, y, n_mix, n_classes=256, weight_reg=0.):
+def discretizsed_mol_loss(out, y, n_mix, n_classes=1000, weight_reg=0.):
     '''
     
     :param out: (b, t, h)
@@ -690,14 +474,15 @@ def discretizsed_mol_loss(out, y, n_mix, n_classes=256, weight_reg=0.):
     mu = tf.nn.sigmoid(mu)  # (b, t, n)
 
     log_var = out[..., n_mix: 2 * n_mix]
-    # TODO softplus
-    log_var = tf.maximum(log_var, -7.0)  # (b, t, n)
+    log_var = tf.nn.softplus(log_var)  # (b, t, n)
+    # log_var = tf.maximum(log_var, -7.0)  # (b, t, n)
 
     log_pi = out[..., 2 * n_mix: 3 * n_mix]  # (b, t, n)
-    # TODO safe softmax, any idea?
+    # TODO safe softmax, better idea?
     # log_pi = normalize(log_pi, type='ins', is_training=is_training, scope='normalize_pi')
-    # m, s = tf.nn.moments(log_pi)
-    log_pi = log_pi - tf.reduce_max(log_pi, axis=-1, keepdims=True)
+    # log_pi = log_pi - tf.reduce_max(log_pi, axis=-1, keepdims=True)
+    m, s = tf.nn.moments(log_pi, axes=[-1], keep_dims=True)
+    log_pi = (log_pi - m) / s
     log_pi = tf.nn.log_softmax(log_pi)
 
     # (b, t, 1) => (b, t, n)
@@ -724,7 +509,7 @@ def discretizsed_mol_loss(out, y, n_mix, n_classes=256, weight_reg=0.):
 
     log_prob = log_prob + log_pi
 
-    # tf.summary.histogram('net2/prob_max', tf.reduce_max(tf.exp(log_prob), axis=-1))
+    tf.summary.histogram('net2/prob_max', tf.reduce_max(tf.exp(log_prob), axis=-1))
 
     log_prob = tf.reduce_logsumexp(log_prob, axis=-1)
 
@@ -740,4 +525,4 @@ def discretizsed_mol_loss(out, y, n_mix, n_classes=256, weight_reg=0.):
     # tf.summary.scalar('net2/train/loss_mle', loss_mle)
     # tf.summary.scalar('net2/train/loss_mix', loss_mix)
 
-    return loss
+    return loss, mu, log_var, log_pi

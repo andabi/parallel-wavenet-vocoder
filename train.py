@@ -51,18 +51,12 @@ def train(case='default', ckpt=None, gpu=None, r=False):
         ],
         max_epoch=hp.train.num_epochs,
         steps_per_epoch=hp.train.steps_per_epoch,
-        # session_config=tf.ConfigProto(
-        #     gpu_options=tf.GPUOptions(
-                # allow_growth=True,
-                # per_process_gpu_memory_fraction=0.4
-        #     )
-        # )
     )
     ckpt = '{}/{}'.format(hp.logdir, ckpt) if ckpt else tf.train.latest_checkpoint(hp.logdir)
     if ckpt:
         train_conf.session_init = SaverRestore(ckpt)
 
-    if gpu:
+    if gpu is not None:
         os.environ['CUDA_VISIBLE_DEVICES'] = gpu
         train_conf.nr_tower = len(gpu.split(','))
 
