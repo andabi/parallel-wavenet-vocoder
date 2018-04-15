@@ -11,26 +11,30 @@ signal:
     min_db: -55
     max_length: 32000
 model:
-    dilations: [1, 2, 4, 8, 16, 32]  #, 64, 128, 256, 512]
+    dilations: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
 #                  1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
     filter_width: 2
     residual_channels: 32
     dilation_channels: 32
     quantization_channels: 128
     skip_channels: 256
+    condition_channels: 32
     use_biases: True
-    n_iaf: 2
-logdir_path: '/data/private/iaf-vocoder/logdir'
+    n_iaf: 4
+    normalize: True
 train:
     data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
     batch_size: 8
     n_mix: 10
     lr: 0.0001
     num_epochs: 100000
-    steps_per_epoch: 1
+    steps_per_epoch: 100
     save_per_epoch: 100
-    num_gpu: 1
+    num_gpu: 8
 generate:
     data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
 #    data_path: '/data/public/rw/LJSpeech-1.0_processed/*.wav'
     batch_size: 3
+    generate_per_epoch: 10
+logdir_path: '/data/private/iaf-vocoder/logdir'
+debug_port: 1028

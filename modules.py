@@ -451,14 +451,27 @@ def normalize(inputs,
     return outputs
 
 
+# TODO generalization
+def instance_normalization(input, epsilon=1e-8):
+    inputs_shape = input.get_shape()
+    params_shape = inputs_shape[-1:]
+    time_axis = 1
+
+    mean, variance = tf.nn.moments(input, [time_axis], keep_dims=True)
+    beta = tf.get_variable("beta", shape=params_shape, initializer=tf.zeros_initializer)
+    gamma = tf.get_variable("gamma", shape=params_shape, initializer=tf.ones_initializer)
+    normalized = (input - mean) / ((variance + epsilon) ** (.5))
+    output = gamma * normalized + beta
+    return output
+
+
 def l2_loss(out, y):
-    out = tf.layers.dense(out, units=1)  # (n, t, 1)
     loss = tf.squared_difference(out, y)
     loss = tf.reduce_mean(loss)
-    return loss
+    return loss, out
 
 
-def discretizsed_mol_loss(out, y, n_mix, n_classes=1000, weight_reg=0.):
+def discretized_mol_loss(out, y, n_mix, n_classes=1000, weight_reg=0.):
     '''
     
     :param out: (b, t, h)
@@ -479,10 +492,10 @@ def discretizsed_mol_loss(out, y, n_mix, n_classes=1000, weight_reg=0.):
 
     log_pi = out[..., 2 * n_mix: 3 * n_mix]  # (b, t, n)
     # TODO safe softmax, better idea?
-    # log_pi = normalize(log_pi, type='ins', is_training=is_training, scope='normalize_pi')
+    # log_pi = normalize(0log_pi, type='ins', is_training=is_training, scope='normalize_pi')
     # log_pi = log_pi - tf.reduce_max(log_pi, axis=-1, keepdims=True)
-    m, s = tf.nn.moments(log_pi, axes=[-1], keep_dims=True)
-    log_pi = (log_pi - m) / s
+    # m, s = tf.nn.moments(log_pi, axes=[-1], keep_dims=True)
+    # log_pi = (log_pi - m) / s
     log_pi = tf.nn.log_softmax(log_pi)
 
     # (b, t, 1) => (b, t, n)

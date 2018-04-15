@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-#!/usr/bin/env python
+# !/usr/bin/env python
 
 
 # -*- coding: utf-8 -*-
@@ -15,18 +15,19 @@ from data_load import DataFlow
 from hparam import hparam as hp
 from models import IAFVocoder
 import fire
-import numpy as np
+from tensorflow.python import debug as tf_debug
+from tensorpack.tfutils.sesscreate import SessionCreatorAdapter, NewSessionCreator
 
 
 def get_eval_input_names():
-    return ['melspec']
+    return ['wav', 'melspec']
 
 
 def get_eval_output_names():
-    return ['pred_wav']
+    return ['generate/pred_wav', 'audio/pred', 'audio/gt']
 
 
-def generate(case='default', ckpt=None, gpu=None):
+def generate(case='default', ckpt=None, gpu=None, debug=False):
     '''
     :param case: experiment case name
     :param ckpt: checkpoint to load model
@@ -48,8 +49,17 @@ def generate(case='default', ckpt=None, gpu=None):
     ckpt = '{}/{}'.format(hp.logdir, ckpt) if ckpt else tf.train.latest_checkpoint(hp.logdir)
     print('{} loaded.'.format(ckpt))
 
+    session_config = tf.ConfigProto(
+        device_count={'CPU': 1, 'GPU': 0},
+    )
+    sess = NewSessionCreator(config=session_config)
+    # session supporting tensorboard debugging.
+    if debug:
+        sess = SessionCreatorAdapter(sess, lambda sess: tf_debug.TensorBoardDebugWrapperSession(sess, 'localhost:{}'.format(hp.debug_port)))
+
     # predictor
     pred_conf = PredictConfig(
+        session_creator=sess,
         model=model,
         input_names=get_eval_input_names(),
         output_names=get_eval_output_names(),
@@ -57,16 +67,14 @@ def generate(case='default', ckpt=None, gpu=None):
     generate_audio = OfflinePredictor(pred_conf)
 
     # feed forward
-    pred_wav, = generate_audio(melspec)
+    _, audio_pred, audio_gt = generate_audio(gt_wav, melspec)
 
-    tf.summary.audio('generate/pred', pred_wav, hp.signal.sr)
-    tf.summary.audio('generate/gt', gt_wav, hp.signal.sr)
-
+    # write audios in tensorboard
     writer = tf.summary.FileWriter(hp.logdir)
-    with tf.Session() as sess:
-        summ = sess.run(tf.summary.merge_all())
-        writer.add_summary(summ)
+    writer.add_summary(audio_pred)
+    writer.add_summary(audio_gt)
     writer.close()
+
 
 if __name__ == '__main__':
     fire.Fire(generate)

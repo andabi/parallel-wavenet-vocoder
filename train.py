@@ -18,6 +18,33 @@ from models import IAFVocoder
 import tensorflow as tf
 import fire
 from utils import remove_all_files
+from tensorpack.callbacks.base import Callback
+from tensorpack.callbacks.saver import ModelSaver
+from generate import get_eval_input_names, get_eval_output_names
+
+
+class GenerateCallback(Callback):
+    def _setup_graph(self):
+        self.generator = self.trainer.get_predictor(
+            get_eval_input_names(),
+            get_eval_output_names())
+        self.df = DataFlow(hp.generate.data_path, hp.generate.batch_size)
+        self.writer = tf.summary.FileWriter(hp.logdir)
+
+    def _trigger_epoch(self):
+        if self.epoch_num % hp.generate.generate_per_epoch == 0:
+            gt_wav, melspec = self.df().get_data().next()
+            _, audio_pred, audio_gt = self.generator(gt_wav, melspec)
+
+            # write audios in tensorboard
+            self.writer.add_summary(audio_pred)
+            self.writer.add_summary(audio_gt)
+            self.writer.flush()
+            self.trainer.monitors.put_scalar('eval/accuracy', acc)
+
+
+    def _after_train(self):
+        self.writer.close()
 
 
 def train(case='default', ckpt=None, gpu=None, r=False):

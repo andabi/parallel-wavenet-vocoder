@@ -1,0 +1,55 @@
+sanity:
+  model:
+    dilations: [1, 2, 4, 8, 16, 32]
+    normalize: False
+  train:
+    batch_size: 1
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+  generate:
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+    generate_per_epoch: 1
+sanity/norm:
+  model:
+    dilations: [1, 2, 4, 8, 16, 32]
+  train:
+    lr: 0.0005
+    batch_size: 1
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+  generate:
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+    generate_per_epoch: 1
+sanity/iaf4:
+  model:
+    dilations: [1, 2, 4, 8, 16, 32]
+    n_iaf: 4
+  train:
+    lr: 0.0005
+    batch_size: 1
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+  generate:
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+    generate_per_epoch: 1
+sanity/tran:
+  model:
+    n_iaf: 4
+  train:
+    lr: 0.0005
+    batch_size: 1
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+  generate:
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+    generate_per_epoch: 1
+l2/min:
+  model:
+    dilations: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+    filter_width: 2
+    residual_channels: 32
+    dilation_channels: 32
+    quantization_channels: 64
+    skip_channels: 64
+    condition_channels: 32
+    use_biases: True
+    n_iaf: 3
+    normalize: True
+  train:
+    lr: 0.0003
