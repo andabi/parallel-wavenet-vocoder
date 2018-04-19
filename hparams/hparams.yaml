@@ -1,13 +1,10 @@
-sanity:
-  model:
-    dilations: [1, 2, 4, 8, 16, 32]
-    normalize: False
+test:
   train:
     batch_size: 1
     data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
   generate:
     data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
-    generate_per_epoch: 1
+    every_n_epoch: 1
 sanity/norm:
   model:
     dilations: [1, 2, 4, 8, 16, 32]
@@ -17,7 +14,7 @@ sanity/norm:
     data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
   generate:
     data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
-    generate_per_epoch: 1
+    every_n_epoch: 1
 sanity/iaf4:
   model:
     dilations: [1, 2, 4, 8, 16, 32]
@@ -28,7 +25,7 @@ sanity/iaf4:
     data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
   generate:
     data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
-    generate_per_epoch: 1
+    every_n_epoch: 1
 sanity/tran:
   model:
     n_iaf: 4
@@ -38,7 +35,7 @@ sanity/tran:
     data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
   generate:
     data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
-    generate_per_epoch: 1
+    every_n_epoch: 1
 l2/min:
   model:
     dilations: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
@@ -53,21 +50,6 @@ l2/min:
     normalize: True
   train:
     lr: 0.00005
-l2/cond:
-  model:
-    dilations: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
-    filter_width: 2
-    residual_channels: 32
-    dilation_channels: 32
-    quantization_channels: 64
-    skip_channels: 64
-    condition_channels: 32
-    use_biases: True
-    n_iaf: 3
-    normalize: True
-    condition_all_iaf: False
-  train:
-    lr: 0.0001
 l2/iaf4:
   model:
     dilations: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
@@ -82,28 +64,14 @@ l2/iaf4:
     normalize: True
   train:
     lr: 0.0001
-l2/cond_iaf4:
-  model:
-    dilations: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
-    filter_width: 2
-    residual_channels: 32
-    dilation_channels: 32
-    quantization_channels: 64
-    skip_channels: 64
-    condition_channels: 32
-    use_biases: True
-    n_iaf: 4
-    normalize: True
-    condition_all_iaf: False
-  train:
-    lr: 0.0001
-l2/len8000:
-  signal:
-    max_length: 8000
-  model:
-    quantization_channels: 64
-    skip_channels: 64
-    condition_channels: 32
+l2/iaf4_default:
   train:
     lr: 0.0002
-    batch_size: 32
+l2/iaf5:
+  model:
+    n_iaf: 5
+l2/iaf4_tran:
+  model:
+    cond_upsample_method: 'transposed_conv'
+  train:
+    weight_power_loss: 1.

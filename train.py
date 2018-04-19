@@ -32,7 +32,7 @@ from generate import get_eval_input_names, get_eval_output_names
 #         self.writer = tf.summary.FileWriter(hp.logdir)
 #
 #     def _trigger_epoch(self):
-#         if self.epoch_num % hp.generate.generate_per_epoch == 0:
+#         if self.epoch_num % hp.generate.every_n_epoch == 0:
 #             gt_wav, melspec = self.df().get_data().next()
 #             _, audio_pred, audio_gt = self.generator(gt_wav, melspec)
 #

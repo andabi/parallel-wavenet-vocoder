@@ -23,11 +23,13 @@ model:
     n_iaf: 4
     normalize: True
     condition_all_iaf: True
+    cond_upsample_method: 'repeat'
 train:
     data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
     batch_size: 8
+    lr: 0.0002
     n_mix: 10
-    lr: 0.0001
+    weight_power_loss: 0.
     num_epochs: 100000
     steps_per_epoch: 100
     save_per_epoch: 100
@@ -36,6 +38,6 @@ generate:
     data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
 #    data_path: '/data/public/rw/LJSpeech-1.0_processed/*.wav'
     batch_size: 3
-    generate_per_epoch: 10
+    every_n_epoch: 10
 logdir_path: '/data/private/iaf-vocoder/logdir'
 debug_port: 1028

@@ -3,6 +3,7 @@
 
 
 import tensorflow as tf
+from tensorflow.contrib.signal import stft
 
 
 class IAFLayer(object):
@@ -357,7 +358,7 @@ def instance_normalization(input, epsilon=1e-8):
 def l2_loss(out, y):
     loss = tf.squared_difference(out, y)
     loss = tf.reduce_mean(loss)
-    return loss, out
+    return loss
 
 
 def discretized_mol_loss(out, y, n_mix, n_classes=1000, weight_reg=0.):
@@ -428,3 +429,12 @@ def discretized_mol_loss(out, y, n_mix, n_classes=1000, weight_reg=0.):
     # tf.summary.scalar('net2/train/loss_mix', loss_mix)
 
     return loss, mu, log_var, log_pi
+
+
+def power_loss(out, y, win_length, hop_length):
+
+    def power(wav):
+        stft_matrix = stft(wav, win_length, hop_length)
+        return tf.square(tf.abs(stft_matrix))
+
+    return tf.squared_difference(power(out), power(y))
