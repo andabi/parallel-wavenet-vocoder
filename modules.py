@@ -437,4 +437,6 @@ def power_loss(out, y, win_length, hop_length):
         stft_matrix = stft(wav, win_length, hop_length)
         return tf.square(tf.abs(stft_matrix))
 
-    return tf.squared_difference(power(out), power(y))
+    loss = tf.squared_difference(power(out), power(y))
+    loss = tf.reduce_mean(loss)
+    return loss

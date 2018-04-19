@@ -2,37 +2,8 @@ test:
   train:
     batch_size: 1
     data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
-  generate:
-    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
-    every_n_epoch: 1
-sanity/norm:
-  model:
-    dilations: [1, 2, 4, 8, 16, 32]
-  train:
-    lr: 0.0005
-    batch_size: 1
-    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
-  generate:
-    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
-    every_n_epoch: 1
-sanity/iaf4:
-  model:
-    dilations: [1, 2, 4, 8, 16, 32]
-    n_iaf: 4
-  train:
-    lr: 0.0005
-    batch_size: 1
-    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
-  generate:
-    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
-    every_n_epoch: 1
-sanity/tran:
-  model:
-    n_iaf: 4
-  train:
-    lr: 0.0005
-    batch_size: 1
-    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+    steps_per_epoch: 1
+    num_gpu: 1
   generate:
     data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
     every_n_epoch: 1
@@ -73,5 +44,3 @@ l2/iaf5:
 l2/iaf4_tran:
   model:
     cond_upsample_method: 'transposed_conv'
-  train:
-    weight_power_loss: 1.
