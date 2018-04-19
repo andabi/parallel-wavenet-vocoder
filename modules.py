@@ -12,7 +12,7 @@ class IAFLayer(object):
         self.ar_model = ar_model
 
     # network
-    def __call__(self, input, condition):
+    def __call__(self, input, condition=None):
         '''
         input = (n, t, h), condition = (n, t, h)
         '''
@@ -24,9 +24,7 @@ class IAFLayer(object):
         return out
 
 
-# TODO generalize: padding valid => same, no slice
 def causal_conv(value, filter_, dilation, name='causal_conv'):
-
     def time_to_batch(value, dilation, name=None):
         with tf.name_scope('time_to_batch'):
             shape = tf.shape(value)
@@ -48,16 +46,18 @@ def causal_conv(value, filter_, dilation, name='causal_conv'):
         filter_width = tf.shape(filter_)[0]
         if dilation > 1:
             transformed = time_to_batch(value, dilation)
-            conv = tf.nn.conv1d(transformed, filter_, stride=1, padding='VALID')
+            # for left-side padding because tf.nn.conv1d do not support left-side padding with padding='SAME'
+            padded = tf.pad(transformed, [[0, 0], [filter_width - 1, 0], [0, 0]])
+            conv = tf.nn.conv1d(padded, filter_, stride=1, padding='VALID')
             restored = batch_to_time(conv, dilation)
-        else:
-            restored = tf.nn.conv1d(value, filter_, stride=1, padding='VALID')
-        # Remove excess elements at the end.
-        out_width = tf.shape(value)[1] - (filter_width - 1) * dilation
-        result = tf.slice(restored,
-                          [0, 0, 0],
-                          [-1, out_width, -1])
 
+            # Remove excess elements at the end caused by padding in time_to_batch.
+            result = tf.slice(restored,
+                              [0, 0, 0],
+                              [-1, tf.shape(value)[1], -1])
+        else:
+            padded = tf.pad(value, [[0, 0], [filter_width - 1, 0], [0, 0]])
+            result = tf.nn.conv1d(padded, filter_, stride=1, padding='VALID')
         return result
 
 
@@ -123,26 +123,17 @@ class WaveNet(object):
         self.variables = self._create_variables()
 
     # network
-    def __call__(self, input_batch, condition_batch):
-        # padding at the beginning by receptive field size. length = #timesteps + receptive field size
-        input_batch = tf.pad(input_batch, [[0, 0], [self.receptive_field, 0], [0, 0]])
-        condition_batch = tf.pad(condition_batch, [[0, 0], [self.receptive_field, 0], [0, 0]])
-
+    def __call__(self, input_batch, condition_batch=None):
         '''Construct the WaveNet network.'''
         outputs = []
-        current_layer = input_batch
-
-        current_layer = self._create_causal_layer(current_layer)  # length = length - 1 = #timesteps + receptive field size - 1
-
-        output_width = tf.shape(current_layer)[1] - self.receptive_field + 1  # length = #timesteps
+        current_layer = self._create_causal_layer(input_batch)
 
         # Add all defined dilation layers.
         with tf.name_scope('dilated_stack'):
             for layer_index, dilation in enumerate(self.dilations):
                 with tf.name_scope('layer{}'.format(layer_index)):
                     output, current_layer = self._create_dilation_layer(
-                        current_layer, layer_index, dilation,
-                        condition_batch, output_width)
+                        current_layer, layer_index, dilation, condition_batch)
                     outputs.append(output)
 
         with tf.name_scope('postprocessing'):
@@ -184,12 +175,10 @@ class WaveNet(object):
         with tf.variable_scope('wavenet'):
             with tf.variable_scope('causal_layer'):
                 layer = dict()
-                initial_channels = self.quantization_channels
-                initial_filter_width = self.filter_width
                 layer['filter'] = tf.get_variable(
                     'filter',
-                    [initial_filter_width,
-                     initial_channels,
+                    [self.filter_width,
+                     self.quantization_channels,
                      self.residual_channels])
                 var['causal_layer'] = layer
 
@@ -274,7 +263,7 @@ class WaveNet(object):
             return causal_conv(input_batch, weights_filter, 1)
 
     def _create_dilation_layer(self, input_batch, layer_index, dilation,
-                               condition_batch, output_width):
+                               condition_batch):
         '''Creates a single causal dilated convolution layer.
 
         Args:
@@ -311,10 +300,6 @@ class WaveNet(object):
         conv_gate = causal_conv(input_batch, weights_gate, dilation)
 
         if condition_batch is not None:
-            # cut unused time steps at the beginning.
-            condition_cut = tf.shape(condition_batch)[1] - tf.shape(conv_filter)[1]
-            condition_batch = tf.slice(condition_batch, [0, condition_cut, 0], [-1, -1, -1])
-
             weights_cond_filter = variables['cond_filtweights']
             conv_filter = conv_filter + tf.nn.conv1d(condition_batch,
                                                      weights_cond_filter,
@@ -342,11 +327,9 @@ class WaveNet(object):
             out, weights_dense, stride=1, padding="SAME", name="dense")
 
         # The 1x1 conv to produce the skip output
-        skip_cut = tf.shape(out)[1] - output_width
-        out_skip = tf.slice(out, [0, skip_cut, 0], [-1, -1, -1])
         weights_skip = variables['skip']
         skip_contribution = tf.nn.conv1d(
-            out_skip, weights_skip, stride=1, padding="SAME", name="skip")
+            out, weights_skip, stride=1, padding="SAME", name="skip")
 
         if self.use_biases:
             dense_bias = variables['dense_bias']
@@ -354,101 +337,7 @@ class WaveNet(object):
             transformed = transformed + dense_bias
             skip_contribution = skip_contribution + skip_bias
 
-        input_cut = tf.shape(input_batch)[1] - tf.shape(transformed)[1]
-        input_batch = tf.slice(input_batch, [0, input_cut, 0], [-1, -1, -1])
-
         return skip_contribution, input_batch + transformed
-
-
-def normalize(inputs,
-              type="bn",
-              decay=.999,
-              epsilon=1e-8,
-              is_training=True,
-              reuse=None,
-              activation_fn=None,
-              scope="normalize"):
-    '''Applies {batch|layer} normalization.
-
-    Args:
-      inputs: A tensor with 2 or more dimensions, where the first dimension has
-        `batch_size`. If type is `bn`, the normalization is over all but 
-        the last dimension. Or if type is `ln`, the normalization is over 
-        the last dimension. Note that this is different from the native 
-        `tf.contrib.layers.batch_norm`. For this I recommend you change
-        a line in ``tensorflow/contrib/layers/python/layers/layer.py` 
-        as follows.
-        Before: mean, variance = nn.moments(inputs, axis, keep_dims=True)
-        After: mean, variance = nn.moments(inputs, [-1], keep_dims=True)
-      type: A string. Either "bn" or "ln".
-      decay: Decay for the moving average. Reasonable values for `decay` are close
-        to 1.0, typically in the multiple-nines range: 0.999, 0.99, 0.9, etc.
-        Lower `decay` value (recommend trying `decay`=0.9) if model experiences
-        reasonably good training performance but poor validation and/or test
-        performance.
-      is_training: Whether or not the layer is in training mode. W
-      activation_fn: Activation function.
-      scope: Optional scope for `variable_scope`.
-
-    Returns:
-      A tensor with the same shape and data dtype as `inputs`.
-    '''
-    if type == "bn":
-        inputs_shape = inputs.get_shape()
-        inputs_rank = inputs_shape.ndims
-
-        # use fused batch norm if inputs_rank in [2, 3, 4] as it is much faster.
-        # pay attention to the fact that fused_batch_norm requires shape to be rank 4 of NHWC.
-        if inputs_rank in [2, 3, 4]:
-            if inputs_rank == 2:
-                inputs = tf.expand_dims(inputs, axis=1)
-                inputs = tf.expand_dims(inputs, axis=2)
-            elif inputs_rank == 3:
-                inputs = tf.expand_dims(inputs, axis=1)
-
-            outputs = tf.contrib.layers.batch_norm(inputs=inputs,
-                                                   decay=decay,
-                                                   center=True,
-                                                   scale=True,
-                                                   updates_collections=None,
-                                                   is_training=is_training,
-                                                   scope=scope,
-                                                   zero_debias_moving_mean=True,
-                                                   fused=True,
-                                                   reuse=reuse)
-            # restore original shape
-            if inputs_rank == 2:
-                outputs = tf.squeeze(outputs, axis=[1, 2])
-            elif inputs_rank == 3:
-                outputs = tf.squeeze(outputs, axis=1)
-        else:  # fallback to naive batch norm
-            outputs = tf.contrib.layers.batch_norm(inputs=inputs,
-                                                   decay=decay,
-                                                   center=True,
-                                                   scale=True,
-                                                   updates_collections=None,
-                                                   is_training=is_training,
-                                                   scope=scope,
-                                                   reuse=reuse,
-                                                   fused=False)
-    elif type in ("ln", "ins"):
-        reduction_axis = -1 if type == "ln" else 1
-        with tf.variable_scope(scope, reuse=reuse):
-            inputs_shape = inputs.get_shape()
-            params_shape = inputs_shape[-1:]
-
-            mean, variance = tf.nn.moments(inputs, [reduction_axis], keep_dims=True)
-            beta = tf.get_variable("beta", shape=params_shape, initializer=tf.zeros_initializer)
-            gamma = tf.get_variable("gamma", shape=params_shape, initializer=tf.ones_initializer)
-            normalized = (inputs - mean) / ((variance + epsilon) ** (.5))
-            outputs = gamma * normalized + beta
-    else:
-        outputs = inputs
-
-    if activation_fn:
-        outputs = activation_fn(outputs)
-
-    return outputs
 
 
 # TODO generalization

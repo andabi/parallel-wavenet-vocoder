@@ -51,19 +51,19 @@ class IAFVocoder(ModelDesc):
         :return: 
         '''
         # option1) Upsample melspec to fit to shape of waveform. (n, t_mel, n_mel) => (n, t, h)
-        stride1, stride2 = 10, 8
-
-        w1 = tf.get_variable('transposed_conv_1_weights',
-                             shape=(stride1, 1, hp.model.condition_channels * 2, hp.signal.n_mels))
-        condition = tf.expand_dims(melspec, 2)
-        condition = tf.nn.conv2d_transpose(condition, w1, output_shape=(
-            -1, stride1 * self.t_mel, 1, hp.model.condition_channels * 2), strides=[1, stride1, 1, 1])
-        w2 = tf.get_variable('transposed_conv_2_weights',
-                             shape=(stride2, 1, hp.model.condition_channels, hp.model.condition_channels * 2))
-        condition = tf.nn.conv2d_transpose(condition, w2, output_shape=(
-            -1, stride1 * stride2 * self.t_mel, 1, hp.model.condition_channels), strides=[1, stride2, 1, 1])  # (n, t, h)
-        condition = tf.squeeze(condition, 2)
-        condition = condition[:, hp.signal.hop_length // 2: -hp.signal.hop_length // 2, :]
+        # stride1, stride2 = 10, 8
+        # assert(stride1 * stride2 == hp.signal.hop_length)
+        # w1 = tf.get_variable('transposed_conv_1_weights',
+        #                      shape=(stride1, 1, 2 * hp.model.condition_channels, hp.signal.n_mels))
+        # condition = tf.expand_dims(melspec, 2)
+        # condition = tf.nn.conv2d_transpose(condition, w1, output_shape=(
+        #     -1, stride1 * self.t_mel, 1, 2 * hp.model.condition_channels), strides=[1, stride1, 1, 1])
+        # w2 = tf.get_variable('transposed_conv_2_weights',
+        #                      shape=(stride2, 1, hp.model.condition_channels, 2 * hp.model.condition_channels))
+        # condition = tf.nn.conv2d_transpose(condition, w2, output_shape=(
+        #     -1, hp.signal.hop_length * self.t_mel, 1, hp.model.condition_channels), strides=[1, stride2, 1, 1])  # (n, t, h)
+        # condition = tf.squeeze(condition, 2)
+        # condition = condition[:, hp.signal.hop_length // 2: -hp.signal.hop_length // 2, :]
 
         # option2) just copy value and expand dim of time step
         condition = tf.layers.dense(melspec, units=hp.model.condition_channels)
@@ -105,7 +105,7 @@ class IAFVocoder(ModelDesc):
                     condition_channels=hp.model.condition_channels)
                 iaf = IAFLayer(batch_size=hp.train.batch_size, n_hidden_units=hp.model.quantization_channels,
                                ar_model=ar_model)
-                input = iaf(input, condition)  # (n, t, h)
+                input = iaf(input, condition if hp.model.condition_all_iaf or i is 0 else None) # (n, t, h)
 
             # normalization
             if hp.model.normalize:

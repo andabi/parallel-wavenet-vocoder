@@ -23,28 +23,26 @@ from tensorpack.callbacks.saver import ModelSaver
 from generate import get_eval_input_names, get_eval_output_names
 
 
-class GenerateCallback(Callback):
-    def _setup_graph(self):
-        self.generator = self.trainer.get_predictor(
-            get_eval_input_names(),
-            get_eval_output_names())
-        self.df = DataFlow(hp.generate.data_path, hp.generate.batch_size)
-        self.writer = tf.summary.FileWriter(hp.logdir)
-
-    def _trigger_epoch(self):
-        if self.epoch_num % hp.generate.generate_per_epoch == 0:
-            gt_wav, melspec = self.df().get_data().next()
-            _, audio_pred, audio_gt = self.generator(gt_wav, melspec)
-
-            # write audios in tensorboard
-            self.writer.add_summary(audio_pred)
-            self.writer.add_summary(audio_gt)
-            self.writer.flush()
-            self.trainer.monitors.put_scalar('eval/accuracy', acc)
-
-
-    def _after_train(self):
-        self.writer.close()
+# class GenerateCallback(Callback):
+#     def _setup_graph(self):
+#         self.generator = self.trainer.get_predictor(
+#             get_eval_input_names(),
+#             get_eval_output_names())
+#         self.df = DataFlow(hp.generate.data_path, hp.generate.batch_size)
+#         self.writer = tf.summary.FileWriter(hp.logdir)
+#
+#     def _trigger_epoch(self):
+#         if self.epoch_num % hp.generate.generate_per_epoch == 0:
+#             gt_wav, melspec = self.df().get_data().next()
+#             _, audio_pred, audio_gt = self.generator(gt_wav, melspec)
+#
+#             # write audios in tensorboard
+#             self.writer.add_summary(audio_pred)
+#             self.writer.add_summary(audio_gt)
+#             self.writer.flush()
+#
+#     def _after_train(self):
+#         self.writer.close()
 
 
 def train(case='default', ckpt=None, gpu=None, r=False):
@@ -74,7 +72,7 @@ def train(case='default', ckpt=None, gpu=None, r=False):
         data=QueueInput(df(n_prefetch=1000, n_thread=4)),
         callbacks=[
             ModelSaver(checkpoint_dir=hp.logdir),
-            # TODO EvalCallback()
+            # TODO GenerateCallback()
         ],
         max_epoch=hp.train.num_epochs,
         steps_per_epoch=hp.train.steps_per_epoch,
@@ -84,8 +82,8 @@ def train(case='default', ckpt=None, gpu=None, r=False):
         train_conf.session_init = SaverRestore(ckpt)
 
     if gpu is not None:
-        os.environ['CUDA_VISIBLE_DEVICES'] = gpu
-        train_conf.nr_tower = len(gpu.split(','))
+        os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(map(str, gpu))
+        train_conf.nr_tower = len(gpu)
 
     if hp.train.num_gpu <= 1:
         trainer = SimpleTrainer()

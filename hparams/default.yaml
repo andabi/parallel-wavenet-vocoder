@@ -22,6 +22,7 @@ model:
     use_biases: True
     n_iaf: 4
     normalize: True
+    condition_all_iaf: True
 train:
     data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
     batch_size: 8
