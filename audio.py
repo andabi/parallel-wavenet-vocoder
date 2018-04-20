@@ -271,7 +271,7 @@ def db2amp(db):
     return librosa.db_to_amplitude(db)
 
 
-def normalize_db(db, max_db, min_db):
+def normalize_db_0_1(db, max_db, min_db):
     """
     Normalize dB-scaled spectrogram values to be in range of 0~1.
     :param db: Decibel-scaled spectrogram.
@@ -283,7 +283,7 @@ def normalize_db(db, max_db, min_db):
     return norm_db
 
 
-def denormalize_db(norm_db, max_db, min_db):
+def denormalize_db_0_1(norm_db, max_db, min_db):
     """
     Denormalize the normalized values to be original dB-scaled value.
     :param norm_db: Normalized spectrogram.
@@ -293,6 +293,28 @@ def denormalize_db(norm_db, max_db, min_db):
     """
     db = np.clip(norm_db, 0, 1) * (max_db - min_db) + min_db
     return db
+
+
+def normalize_db(db, max_db, min_db):
+    """
+    Normalize dB-scaled spectrogram values to be in range of -1~1.
+    :param db: Decibel-scaled spectrogram.
+    :param max_db: Maximum dB.
+    :param min_db: Minimum dB.
+    :return: Normalized spectrogram.
+    """
+    return (denormalize_db_0_1(db ,max_db, min_db) - 0.5) * 2
+
+
+def denormalize_db(norm_db, max_db, min_db):
+    """
+    Denormalize the normalized values to be original dB-scaled value.
+    :param norm_db: Normalized spectrogram.
+    :param max_db: Maximum dB.
+    :param min_db: Minimum dB.
+    :return: Decibel-scaled spectrogram.
+    """
+    return denormalize_db_0_1(norm_db / 2 + 0.5, max_db, min_db)
 
 
 def dynamic_range_compression(db, threshold, ratio, method='downward'):

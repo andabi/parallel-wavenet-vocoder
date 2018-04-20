@@ -18,7 +18,10 @@ class IAFLayer(object):
         input = (n, t, h), condition = (n, t, h)
         '''
         out = self.ar_model(input, condition)
-        out = tf.layers.dense(out, 2 * self.n_hidden_units)  # (n, t, 2h)
+
+        w = tf.get_variable('weights', shape=(1, self.n_hidden_units, 2 * self.n_hidden_units))
+        out = tf.nn.conv1d(out, w, stride=1, padding='SAME')  # (b, t, h) => (b, t, 2h)
+
         mean = out[..., :self.n_hidden_units]  # (n, t, h)
         scale = out[..., self.n_hidden_units:]  # (n, t, h)
         out = input * scale + mean
@@ -356,79 +359,63 @@ def instance_normalization(input, epsilon=1e-8):
 
 
 def l2_loss(out, y):
-    loss = tf.squared_difference(out, y)
-    loss = tf.reduce_mean(loss)
-    return loss
+    with tf.variable_scope('l2_loss'):
+        w = tf.get_variable('weights', shape=(1, out.get_shape().as_list()[-1], 1))
+        out = tf.nn.conv1d(out, w, stride=1, padding='SAME')  # (b, t, h) => (b, t, 1)
+        loss = tf.squared_difference(out, y)
+        loss = tf.reduce_mean(loss)
+        return loss
 
 
-def discretized_mol_loss(out, y, n_mix, n_classes=1000, weight_reg=0.):
+def discretized_mol_loss(mu, stdv, log_pi, y, n_mix, n_classes=256, weight_const=0.):
     '''
-    
+    Selecting the right number of classes (n_classes) is important according to the range of y.
     :param out: (b, t, h)
     :param y: (b, t, 1)
     :param n_mix: 
     :return: 
     '''
-    _, n_timesteps, _ = y.get_shape().as_list()
-    out = tf.layers.dense(out, n_mix * 3,
-                          bias_initializer=tf.random_uniform_initializer(minval=-3., maxval=3.))  # (b, t, 3n)
+    with tf.variable_scope('discretized_mol_loss'):
+        y = tf.tile(y, [1, 1, n_mix])
 
-    mu = out[..., :n_mix]
-    mu = tf.nn.sigmoid(mu)  # (b, t, n)
+        centered_x = y - mu
+        inv_stdv = 1 / (stdv + 1e-12)
+        plus_in = inv_stdv * (centered_x + 1. / n_classes)
+        min_in = inv_stdv * (centered_x - 1. / n_classes)
+        cdf_plus = tf.sigmoid(plus_in)
+        cdf_min = tf.sigmoid(min_in)
 
-    log_var = out[..., n_mix: 2 * n_mix]
-    log_var = tf.nn.softplus(log_var)  # (b, t, n)
-    # log_var = tf.maximum(log_var, -7.0)  # (b, t, n)
+        # log probability for edge case
+        log_cdf_plus = plus_in - tf.nn.softplus(plus_in)
+        log_one_minus_cdf_min = -tf.nn.softplus(min_in)
 
-    log_pi = out[..., 2 * n_mix: 3 * n_mix]  # (b, t, n)
-    # TODO safe softmax, better idea?
-    # log_pi = normalize(0log_pi, type='ins', is_training=is_training, scope='normalize_pi')
-    # log_pi = log_pi - tf.reduce_max(log_pi, axis=-1, keepdims=True)
-    # m, s = tf.nn.moments(log_pi, axes=[-1], keep_dims=True)
-    # log_pi = (log_pi - m) / s
-    log_pi = tf.nn.log_softmax(log_pi)
+        # probability for all other cases
+        cdf_delta = cdf_plus - cdf_min
 
-    # (b, t, 1) => (b, t, n)
-    y = tf.tile(y, [1, 1, n_mix])
+        log_prob = tf.where(y < 0.001, log_cdf_plus,
+                            tf.where(y > 0.999, log_one_minus_cdf_min, tf.log(tf.maximum(cdf_delta, 1e-12))))
 
-    centered_x = y - mu
-    inv_stdv = tf.exp(-log_var)
-    plus_in = inv_stdv * (centered_x + 1 / n_classes)
-    min_in = inv_stdv * (centered_x - 1 / n_classes)
-    cdf_plus = tf.sigmoid(plus_in)
-    cdf_min = tf.sigmoid(min_in)
+        # tf.summary.histogram('net2/train/prob', tf.exp(log_prob))
 
-    # log probability for edge case
-    log_cdf_plus = plus_in - tf.nn.softplus(plus_in)
-    log_one_minus_cdf_min = -tf.nn.softplus(min_in)
+        log_prob = log_prob + log_pi
 
-    # probability for all other cases
-    cdf_delta = cdf_plus - cdf_min
+        tf.summary.histogram('net2/prob_max', tf.reduce_max(tf.exp(log_prob), axis=-1))
 
-    log_prob = tf.where(y < 0.001, log_cdf_plus,
-                        tf.where(y > 0.999, log_one_minus_cdf_min, tf.log(tf.maximum(cdf_delta, 1e-12))))
+        log_prob = tf.reduce_logsumexp(log_prob, axis=-1)
 
-    # tf.summary.histogram('net2/train/prob', tf.exp(log_prob))
+        loss_mle = -tf.reduce_mean(log_prob)
 
-    log_prob = log_prob + log_pi
+        # regularize keeping modals away from each other
+        # mean = tf.reduce_sum(mu * log_pi, axis=-1, keepdims=True)
+        # loss_reg = tf.reduce_sum(log_pi * tf.squared_difference(mu, mean), axis=-1)
+        # loss_reg = -tf.reduce_mean(loss_reg)
+        # loss = loss_mle + weight_const * loss_reg
+        loss = loss_mle
 
-    tf.summary.histogram('net2/prob_max', tf.reduce_max(tf.exp(log_prob), axis=-1))
+        # tf.summary.scalar('net2/train/loss_mle', loss_mle)
+        # tf.summary.scalar('net2/train/loss_mix', loss_mix)
 
-    log_prob = tf.reduce_logsumexp(log_prob, axis=-1)
-
-    loss_mle = -tf.reduce_mean(log_prob)
-
-    # regularize keeping modals away from each other
-    mean = tf.reduce_sum(mu * log_pi, axis=-1, keepdims=True)
-    loss_reg = tf.reduce_sum(log_pi * tf.squared_difference(mu, mean), axis=-1)
-    loss_reg = -tf.reduce_mean(loss_reg)
-
-    loss = loss_mle + weight_reg * loss_reg
-
-    # tf.summary.scalar('net2/train/loss_mle', loss_mle)
-    # tf.summary.scalar('net2/train/loss_mix', loss_mix)
-
-    return loss, mu, log_var, log_pi
+        return loss
 
 
 def power_loss(out, y, win_length, hop_length):

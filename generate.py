@@ -24,7 +24,7 @@ def get_eval_input_names():
 
 
 def get_eval_output_names():
-    return ['generate/pred_wav', 'audio/pred', 'audio/gt']
+    return ['pred_wav', 'audio/pred', 'audio/gt']
 
 
 def generate(case='default', ckpt=None, gpu=None, debug=False):
@@ -74,6 +74,8 @@ def generate(case='default', ckpt=None, gpu=None, debug=False):
     writer.add_summary(audio_pred)
     writer.add_summary(audio_gt)
     writer.close()
+
+    print('Done.')
 
 
 if __name__ == '__main__':
