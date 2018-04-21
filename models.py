@@ -23,15 +23,21 @@ class IAFVocoder(ModelDesc):
         wav, melspec = inputs
         is_training = get_current_tower_context().is_training
 
-        with tf.variable_scope('iaf_vocoder'):
-            mu, stdv, log_pi = self(*inputs)
-
-        out = self.generate(mu, log_pi)
-        out = tf.identity(out, name='pred_wav')
-        with tf.name_scope('loss'):
+        if hp.train.loss is 'mol':
+            with tf.variable_scope('iaf_vocoder'):
+                mu, stdv, log_pi = self(*inputs)
+            out = self.generate(mu, log_pi)
             l_loss = discretized_mol_loss(mu, stdv, log_pi, y=wav, n_mix=hp.train.n_mix)
-            # l_loss = l2_loss(out=out, y=wav)
-            p_loss = power_loss(out=out, y=tf.squeeze(wav, -1),
+        else:
+            with tf.variable_scope('iaf_vocoder'):
+                out = self(*inputs)
+            w = tf.get_variable('weights', shape=(1, out.get_shape().as_list()[-1], 1))
+            out = tf.nn.conv1d(out, w, stride=1, padding='SAME')  # (b, t, h) => (b, t, 1)
+            out = tf.identity(out, name='pred_wav')
+            l_loss = l2_loss(out=out, y=wav)
+
+        with tf.name_scope('loss'):
+            p_loss = power_loss(out=tf.squeeze(out, -1), y=tf.squeeze(wav, -1),
                                 win_length=hp.signal.win_length, hop_length=hp.signal.hop_length)
             tf.summary.scalar('likelihood', l_loss)
             self.cost = l_loss + hp.train.weight_power_loss * p_loss
@@ -41,9 +47,6 @@ class IAFVocoder(ModelDesc):
 
         # build graph for generation phase.
         if not is_training:
-            # with tf.name_scope('generate'):
-                # pred = self.generate(mu, log_pi)
-                # pred = self.generate(out)
             tf.summary.audio('audio/pred', out, hp.signal.sr)
             tf.summary.audio('audio/gt', wav, hp.signal.sr)
 
@@ -82,7 +85,7 @@ class IAFVocoder(ModelDesc):
 
     def generate(self, mu, log_pi):
         argmax = tf.one_hot(tf.argmax(log_pi, axis=-1), hp.train.n_mix)
-        pred = tf.reduce_sum(mu * argmax, axis=-1)
+        pred = tf.reduce_sum(mu * argmax, axis=-1, name='pred_wav', keepdims=True)
         return pred
 
     @auto_reuse_variable_scope
@@ -118,6 +121,9 @@ class IAFVocoder(ModelDesc):
                 with tf.variable_scope('normalize{}'.format(i)):
                     input = instance_normalization(input)
 
+        if hp.train.loss is not 'mol':
+            return input
+
         # parameters of MoL
         with tf.variable_scope('mol'):
             n_mix = hp.train.n_mix
@@ -136,5 +142,4 @@ class IAFVocoder(ModelDesc):
 
             log_pi = out[..., 2 * n_mix: 3 * n_mix]  # (b, t, n)
             log_pi = tf.nn.log_softmax(log_pi)
-
         return mu, stdv, log_pi

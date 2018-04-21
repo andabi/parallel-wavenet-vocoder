@@ -50,6 +50,9 @@ l2/iaf5_power:
     n_iaf: 5
   train:
     weight_power_loss: 0.0005
+l2/iaf5_1x1conv:
+  model:
+    n_iaf: 5
 mol/iaf5:
   model:
     n_iaf: 5

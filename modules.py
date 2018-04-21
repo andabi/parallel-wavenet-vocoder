@@ -360,8 +360,6 @@ def instance_normalization(input, epsilon=1e-8):
 
 def l2_loss(out, y):
     with tf.variable_scope('l2_loss'):
-        w = tf.get_variable('weights', shape=(1, out.get_shape().as_list()[-1], 1))
-        out = tf.nn.conv1d(out, w, stride=1, padding='SAME')  # (b, t, h) => (b, t, 1)
         loss = tf.squared_difference(out, y)
         loss = tf.reduce_mean(loss)
         return loss
