@@ -133,14 +133,8 @@ class IAFVocoder(ModelDesc):
 
             stdv = out[..., n_mix: 2 * n_mix]
             stdv = tf.nn.softplus(stdv)  # (b, t, n)
-            # stdv = tf.maximum(stdv, -7.0)  # (b, t, n)
 
             log_pi = out[..., 2 * n_mix: 3 * n_mix]  # (b, t, n)
-            # TODO safe softmax, better idea?
-            # log_pi = instance_normalization(log_pi)
-            # log_pi = log_pi - tf.reduce_max(log_pi, axis=-1, keepdims=True)
-            # m, s = tf.nn.moments(log_pi, axes=[-1], keep_dims=True)
-            # log_pi = (log_pi - m) / s
             log_pi = tf.nn.log_softmax(log_pi)
 
         return mu, stdv, log_pi

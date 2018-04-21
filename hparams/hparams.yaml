@@ -50,13 +50,9 @@ l2/iaf5_power:
     n_iaf: 5
   train:
     weight_power_loss: 0.0005
-mol/sanity:
+mol/iaf5:
+  model:
+    n_iaf: 5
   train:
-    batch_size: 1
-    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
-    steps_per_epoch: 10
-    num_gpu: 1
-    lr: 0.001
-  generate:
-    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
-    every_n_epoch: 1
+    batch_size: 4
+    num_gpu: 4
