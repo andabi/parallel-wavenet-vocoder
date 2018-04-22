@@ -139,7 +139,8 @@ class IAFVocoder(ModelDesc):
             bias = tf.get_variable('bias', shape=[n_mix * 3, ], initializer=tf.random_uniform_initializer(minval=-3., maxval=3.))
             out = tf.nn.bias_add(out, bias)
 
-            mu = out[..., :n_mix]  # (b, t, n)
+            mu = out[..., :n_mix]
+            mu = tf.nn.tanh(mu)  # (b, t, n)
 
             stdv = out[..., n_mix: 2 * n_mix]
             stdv = tf.nn.softplus(stdv)  # (b, t, n)
