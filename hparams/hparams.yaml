@@ -61,3 +61,18 @@ mol/iaf5:
     num_gpu: 8
     loss: 'mol'
     steps_per_epoch: 100
+l2/iaf4_power:
+  model:
+    n_iaf: 4
+  train:
+    steps_per_epoch: 100
+    weight_power_loss: 0.0005
+sanity/mol:
+  train:
+    batch_size: 1
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+    steps_per_epoch: 10
+    num_gpu: 4
+    loss: 'mol'
+  generate:
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
