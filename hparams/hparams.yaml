@@ -57,5 +57,7 @@ mol/iaf5:
   model:
     n_iaf: 5
   train:
-    batch_size: 4
-    num_gpu: 4
+    batch_size: 8
+    num_gpu: 8
+    loss: 'mol'
+    steps_per_epoch: 100

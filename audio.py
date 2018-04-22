@@ -303,7 +303,7 @@ def normalize_db(db, max_db, min_db):
     :param min_db: Minimum dB.
     :return: Normalized spectrogram.
     """
-    return (denormalize_db_0_1(db ,max_db, min_db) - 0.5) * 2
+    return (normalize_db_0_1(db, max_db, min_db) - 0.5) * 2
 
 
 def denormalize_db(norm_db, max_db, min_db):

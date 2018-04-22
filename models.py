@@ -23,11 +23,14 @@ class IAFVocoder(ModelDesc):
         wav, melspec = inputs
         is_training = get_current_tower_context().is_training
 
-        if hp.train.loss is 'mol':
+        if hp.train.loss == 'mol':
             with tf.variable_scope('iaf_vocoder'):
                 mu, stdv, log_pi = self(*inputs)
-            out = self.generate(mu, log_pi)
+                tf.summary.histogram('mu', mu)
+                tf.summary.histogram('var', stdv)
+                tf.summary.histogram('pi', tf.exp(log_pi))
             l_loss = discretized_mol_loss(mu, stdv, log_pi, y=wav, n_mix=hp.train.n_mix)
+            out = self.generate(mu, log_pi)
         else:
             with tf.variable_scope('iaf_vocoder'):
                 out = self(*inputs)
@@ -47,6 +50,8 @@ class IAFVocoder(ModelDesc):
 
         # build graph for generation phase.
         if not is_training:
+            tf.summary.histogram('hist/wav', wav)
+            tf.summary.histogram('hist/out', out)
             tf.summary.audio('audio/pred', out, hp.signal.sr)
             tf.summary.audio('audio/gt', wav, hp.signal.sr)
 
@@ -121,7 +126,7 @@ class IAFVocoder(ModelDesc):
                 with tf.variable_scope('normalize{}'.format(i)):
                     input = instance_normalization(input)
 
-        if hp.train.loss is not 'mol':
+        if hp.train.loss != 'mol':
             return input
 
         # parameters of MoL
@@ -134,8 +139,7 @@ class IAFVocoder(ModelDesc):
             bias = tf.get_variable('bias', shape=[n_mix * 3, ], initializer=tf.random_uniform_initializer(minval=-3., maxval=3.))
             out = tf.nn.bias_add(out, bias)
 
-            mu = out[..., :n_mix]
-            mu = tf.nn.sigmoid(mu)  # (b, t, n)
+            mu = out[..., :n_mix]  # (b, t, n)
 
             stdv = out[..., n_mix: 2 * n_mix]
             stdv = tf.nn.softplus(stdv)  # (b, t, n)

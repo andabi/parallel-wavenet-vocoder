@@ -24,7 +24,7 @@ def get_eval_input_names():
 
 
 def get_eval_output_names():
-    return ['pred_wav', 'audio/pred', 'audio/gt']
+    return ['pred_wav', 'audio/pred', 'audio/gt', 'hist/wav', 'hist/out']
 
 
 def generate(case='default', ckpt=None, gpu=None, debug=False):
@@ -67,12 +67,14 @@ def generate(case='default', ckpt=None, gpu=None, debug=False):
     generate_audio = OfflinePredictor(pred_conf)
 
     # feed forward
-    _, audio_pred, audio_gt = generate_audio(gt_wav, melspec)
+    _, audio_pred, audio_gt, hist_wav, hist_out = generate_audio(gt_wav, melspec)
 
     # write audios in tensorboard
     writer = tf.summary.FileWriter(hp.logdir)
     writer.add_summary(audio_pred)
     writer.add_summary(audio_gt)
+    writer.add_summary(hist_wav)
+    writer.add_summary(hist_out)
     writer.close()
 
     print('Done.')

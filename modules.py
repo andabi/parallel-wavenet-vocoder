@@ -393,11 +393,11 @@ def discretized_mol_loss(mu, stdv, log_pi, y, n_mix, n_classes=256, weight_const
         log_prob = tf.where(y < 0.001, log_cdf_plus,
                             tf.where(y > 0.999, log_one_minus_cdf_min, tf.log(tf.maximum(cdf_delta, 1e-12))))
 
-        # tf.summary.histogram('net2/train/prob', tf.exp(log_prob))
+        # tf.summary.histogram('prob', tf.exp(log_prob))
 
         log_prob = log_prob + log_pi
 
-        tf.summary.histogram('net2/prob_max', tf.reduce_max(tf.exp(log_prob), axis=-1))
+        tf.summary.histogram('prob_max', tf.reduce_max(tf.exp(log_prob), axis=-1))
 
         log_prob = tf.reduce_logsumexp(log_prob, axis=-1)
 
@@ -410,8 +410,8 @@ def discretized_mol_loss(mu, stdv, log_pi, y, n_mix, n_classes=256, weight_const
         # loss = loss_mle + weight_const * loss_reg
         loss = loss_mle
 
-        # tf.summary.scalar('net2/train/loss_mle', loss_mle)
-        # tf.summary.scalar('net2/train/loss_mix', loss_mix)
+        # tf.summary.scalar('loss_mle', loss_mle)
+        # tf.summary.scalar('loss_mix', loss_mix)
 
         return loss
 
