@@ -76,3 +76,25 @@ sanity/mol:
     loss: 'mol'
   generate:
     data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+logistic/iaf4:
+  model:
+    n_iaf: 4
+logistic/iaf5:
+  model:
+    n_iaf: 5
+logistic/iaf5_power:
+  model:
+    n_iaf: 5
+  train:
+    weight_power_loss: 0.0005
+    num_gpu: 4
+logistic/iaf4_dil2:
+  model:
+    dilations: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512,
+                1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+    n_iaf: 4
+logistic/not_shared:
+  model:
+    n_iaf: 4
+  train:
+    batch_size: 4

@@ -34,7 +34,7 @@ train:
     steps_per_epoch: 100
     save_per_epoch: 100
     num_gpu: 8
-    loss: 'l2'
+    loss: 'l1'
 generate:
     data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
 #    data_path: '/data/public/rw/LJSpeech-1.0_processed/*.wav'

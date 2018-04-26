@@ -6,11 +6,15 @@ from tensorpack.graph_builder.model_desc import ModelDesc, InputDesc
 from tensorpack.tfutils.scope_utils import auto_reuse_variable_scope
 
 from hparam import hparam as hp
-from modules import IAFLayer, WaveNet, discretized_mol_loss, l2_loss, instance_normalization, power_loss
+from modules import LinearIAFLayer, WaveNet, discretized_mol_loss, l2_loss, instance_normalization, power_loss, l1_loss
 from tensorpack.tfutils import get_current_tower_context
 
 
 class IAFVocoder(ModelDesc):
+    '''
+    wav: [-1, 1]
+    '''
+
     def __init__(self, batch_size):
         self.batch_size = batch_size
         self.t_mel = 1 + hp.signal.max_length // hp.signal.hop_length
@@ -37,7 +41,7 @@ class IAFVocoder(ModelDesc):
             w = tf.get_variable('weights', shape=(1, out.get_shape().as_list()[-1], 1))
             out = tf.nn.conv1d(out, w, stride=1, padding='SAME')  # (b, t, h) => (b, t, 1)
             out = tf.identity(out, name='pred_wav')
-            l_loss = l2_loss(out=out, y=wav)
+            l_loss = l1_loss(out=out, y=wav)
 
         with tf.name_scope('loss'):
             p_loss = power_loss(out=tf.squeeze(out, -1), y=tf.squeeze(wav, -1),
@@ -102,23 +106,35 @@ class IAFVocoder(ModelDesc):
                 with tf.variable_scope('normalize'):
                     condition = instance_normalization(condition)
 
-        # Sample from unit gaussian.
-        input = tf.random_normal(
-            shape=(self.batch_size, hp.signal.max_length, hp.model.quantization_channels))  # (n, t, h)
+        # Sample from logistic dist.
+        logstic_dist = tf.contrib.distributions.Logistic(loc=0., scale=1.)
+        input = logstic_dist.sample([self.batch_size, hp.signal.max_length, hp.model.quantization_channels])
         for i in range(hp.model.n_iaf):
             with tf.variable_scope('iaf{}'.format(i)):
-                ar_model = WaveNet(
-                    batch_size=self.batch_size,
-                    dilations=hp.model.dilations,
-                    filter_width=hp.model.filter_width,
-                    residual_channels=hp.model.residual_channels,
-                    dilation_channels=hp.model.dilation_channels,
-                    quantization_channels=hp.model.quantization_channels,
-                    skip_channels=hp.model.skip_channels,
-                    use_biases=hp.model.use_biases,
-                    condition_channels=hp.model.condition_channels)
-                iaf = IAFLayer(batch_size=hp.train.batch_size, n_hidden_units=hp.model.quantization_channels,
-                               ar_model=ar_model)
+                with tf.variable_scope('scaler'):
+                    scaler = WaveNet(
+                        batch_size=self.batch_size,
+                        dilations=hp.model.dilations,
+                        filter_width=hp.model.filter_width,
+                        residual_channels=hp.model.residual_channels,
+                        dilation_channels=hp.model.dilation_channels,
+                        quantization_channels=hp.model.quantization_channels,
+                        skip_channels=hp.model.skip_channels,
+                        use_biases=hp.model.use_biases,
+                        condition_channels=hp.model.condition_channels)
+                with tf.variable_scope('shifter'):
+                    shifter = WaveNet(
+                        batch_size=self.batch_size,
+                        dilations=hp.model.dilations,
+                        filter_width=hp.model.filter_width,
+                        residual_channels=hp.model.residual_channels,
+                        dilation_channels=hp.model.dilation_channels,
+                        quantization_channels=hp.model.quantization_channels,
+                        skip_channels=hp.model.skip_channels,
+                        use_biases=hp.model.use_biases,
+                        condition_channels=hp.model.condition_channels)
+                iaf = LinearIAFLayer(batch_size=hp.train.batch_size, n_hidden_units=hp.model.quantization_channels,
+                                     scaler=scaler, shifter=shifter)
                 input = iaf(input, condition if hp.model.condition_all_iaf or i is 0 else None)  # (n, t, h)
 
             # normalization
@@ -136,7 +152,8 @@ class IAFVocoder(ModelDesc):
             out = tf.nn.conv1d(input, w, stride=1, padding='SAME')  # (b, t, h) => (b, t, 3n)
 
             # bias for various modals
-            bias = tf.get_variable('bias', shape=[n_mix * 3, ], initializer=tf.random_uniform_initializer(minval=-3., maxval=3.))
+            bias = tf.get_variable('bias', shape=[n_mix * 3, ],
+                                   initializer=tf.random_uniform_initializer(minval=-3., maxval=3.))
             out = tf.nn.bias_add(out, bias)
 
             mu = out[..., :n_mix]

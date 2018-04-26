@@ -6,25 +6,21 @@ import tensorflow as tf
 from tensorflow.contrib.signal import stft
 
 
-class IAFLayer(object):
-    def __init__(self, batch_size, n_hidden_units, ar_model):
+class LinearIAFLayer(object):
+    def __init__(self, batch_size, n_hidden_units, scaler, shifter):
         self.batch_size = batch_size
         self.n_hidden_units = n_hidden_units
-        self.ar_model = ar_model
+        self.scaler = scaler
+        self.shifter = shifter
 
     # network
     def __call__(self, input, condition=None):
         '''
         input = (n, t, h), condition = (n, t, h)
         '''
-        out = self.ar_model(input, condition)
-
-        w = tf.get_variable('weights', shape=(1, self.n_hidden_units, 2 * self.n_hidden_units))
-        out = tf.nn.conv1d(out, w, stride=1, padding='SAME')  # (b, t, h) => (b, t, 2h)
-
-        mean = out[..., :self.n_hidden_units]  # (n, t, h)
-        scale = out[..., self.n_hidden_units:]  # (n, t, h)
-        out = input * scale + mean
+        scale = self.scaler(input, condition)
+        shift = self.shifter(input, condition)
+        out = input * scale + shift
         return out
 
 
@@ -362,7 +358,14 @@ def l2_loss(out, y):
     with tf.variable_scope('l2_loss'):
         loss = tf.squared_difference(out, y)
         loss = tf.reduce_mean(loss)
-        return loss
+    return loss
+
+
+def l1_loss(out, y):
+    with tf.variable_scope('l1_loss'):
+        loss = tf.abs(out - y)
+        loss = tf.reduce_mean(loss)
+    return loss
 
 
 def discretized_mol_loss(mu, stdv, log_pi, y, n_mix, n_classes=256, weight_const=0.):
