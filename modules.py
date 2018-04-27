@@ -7,9 +7,8 @@ from tensorflow.contrib.signal import stft
 
 
 class LinearIAFLayer(object):
-    def __init__(self, batch_size, n_hidden_units, scaler, shifter):
+    def __init__(self, batch_size, scaler, shifter):
         self.batch_size = batch_size
-        self.n_hidden_units = n_hidden_units
         self.scaler = scaler
         self.shifter = shifter
 

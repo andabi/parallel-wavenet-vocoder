@@ -38,10 +38,10 @@ def generate(case='default', ckpt=None, gpu=None, debug=False):
     hp.set_hparam_yaml(case)
 
     # dataflow
-    df = DataFlow(hp.generate.data_path, hp.generate.batch_size)
+    df = DataFlow(hp.generate.data_path, hp.generate.batch_size, length=hp.generate.length)
 
     # model
-    model = IAFVocoder(batch_size=hp.generate.batch_size)
+    model = IAFVocoder(batch_size=hp.generate.batch_size, length=hp.generate.length)
 
     # samples
     gt_wav, melspec = df().get_data().next()

@@ -5,7 +5,7 @@ from __future__ import print_function
 
 import os
 
-from tensorpack.callbacks.saver import ModelSaver
+from tensorpack.callbacks.graph import RunUpdateOps
 from tensorpack.tfutils.sessinit import SaverRestore
 from tensorpack.train.interface import TrainConfig
 from tensorpack.train.interface import launch_train_with_config
@@ -59,10 +59,10 @@ def train(case='default', ckpt=None, gpu=None, r=False):
         remove_all_files(hp.logdir)
 
     # model
-    model = IAFVocoder(batch_size=hp.train.batch_size)
+    model = IAFVocoder(batch_size=hp.train.batch_size, length=hp.signal.max_length)
 
     # dataflow
-    df = DataFlow(hp.train.data_path, hp.train.batch_size)
+    df = DataFlow(hp.train.data_path, hp.train.batch_size, length=hp.signal.max_length)
 
     # set logger for event and model saver
     logger.set_logger_dir(hp.logdir)
@@ -72,6 +72,7 @@ def train(case='default', ckpt=None, gpu=None, r=False):
         data=QueueInput(df(n_prefetch=1000, n_thread=4)),
         callbacks=[
             ModelSaver(checkpoint_dir=hp.logdir),
+            RunUpdateOps()  # for batch norm
             # TODO GenerateCallback()
         ],
         max_epoch=hp.train.num_epochs,

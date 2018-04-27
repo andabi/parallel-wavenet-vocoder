@@ -16,12 +16,11 @@ model:
     filter_width: 2
     residual_channels: 32
     dilation_channels: 32
-    quantization_channels: 128
     skip_channels: 256
     condition_channels: 32
     use_biases: True
     n_iaf: 4
-    normalize: True
+    normalize: 'in'
     condition_all_iaf: True
     cond_upsample_method: 'repeat'
 train:
@@ -36,6 +35,7 @@ train:
     num_gpu: 8
     loss: 'l1'
 generate:
+    length: 64000
     data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
 #    data_path: '/data/public/rw/LJSpeech-1.0_processed/*.wav'
     batch_size: 3

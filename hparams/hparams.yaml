@@ -98,3 +98,63 @@ logistic/not_shared:
     n_iaf: 4
   train:
     batch_size: 4
+logistic/h256:
+  model:
+    n_iaf: 4
+#    dilations: [1, 2, 4, 8, 16, 32, 64, 128, 256]
+    quantization_channels: 256
+  train:
+    batch_size: 4
+    num_gpu: 4
+logistic/no_quan:
+  model:
+    n_iaf: 4
+  train:
+    batch_size: 4
+    num_gpu: 8
+logistic/no_norm:
+  model:
+    n_iaf: 4
+    normalize: 'none'
+  train:
+    batch_size: 4
+    num_gpu: 4
+logistic/bn:
+  model:
+    n_iaf: 4
+    normalize: 'bn'
+  train:
+    batch_size: 4
+    num_gpu: 4
+logistic/lj:
+  model:
+    n_iaf: 4
+  train:
+    batch_size: 4
+    num_gpu: 8
+    data_path: '/data/public/rw/LJSpeech-1.0_processed/*.wav'
+  generate:
+    data_path: '/data/public/rw/LJSpeech-1.0_processed/*.wav'
+l/large:
+  signal:
+      max_length: 8000
+  model:
+      residual_channels: 64
+      dilation_channels: 64
+      use_biases: True
+      n_iaf: 6
+  train:
+    batch_size: 8
+    num_gpu: 4
+l/large_tran:
+  signal:
+      max_length: 8000
+  model:
+      residual_channels: 64
+      dilation_channels: 64
+      use_biases: True
+      n_iaf: 6
+      cond_upsample_method: 'transposed_conv'
+  train:
+    batch_size: 8
+    num_gpu: 4
