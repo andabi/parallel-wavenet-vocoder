@@ -23,6 +23,7 @@ model:
     normalize: 'in'
     condition_all_iaf: True
     cond_upsample_method: 'repeat'
+    use_skip_connection: True
 train:
     data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
     batch_size: 8

@@ -123,7 +123,8 @@ class IAFVocoder(ModelDesc):
                         quantization_channels=1,
                         skip_channels=hp.model.skip_channels,
                         use_biases=hp.model.use_biases,
-                        condition_channels=hp.model.condition_channels)
+                        condition_channels=hp.model.condition_channels,
+                        use_skip_connection=hp.model.use_skip_connection)
                 with tf.variable_scope('shifter'):
                     shifter = WaveNet(
                         batch_size=self.batch_size,
@@ -134,7 +135,8 @@ class IAFVocoder(ModelDesc):
                         quantization_channels=1,
                         skip_channels=hp.model.skip_channels,
                         use_biases=hp.model.use_biases,
-                        condition_channels=hp.model.condition_channels)
+                        condition_channels=hp.model.condition_channels,
+                        use_skip_connection=hp.model.use_skip_connection)
                 iaf = LinearIAFLayer(batch_size=hp.train.batch_size, scaler=scaler, shifter=shifter)
                 input = iaf(input, condition if hp.model.condition_all_iaf or i is 0 else None)  # (n, t, h)
 

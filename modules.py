@@ -84,7 +84,8 @@ class WaveNet(object):
                  skip_channels,
                  quantization_channels=2 ** 8,
                  use_biases=False,
-                 condition_channels=None):
+                 condition_channels=None,
+                 use_skip_connection=True):
         '''Initializes the WaveNet model.
 
         Args:
@@ -116,6 +117,7 @@ class WaveNet(object):
         self.use_biases = use_biases
         self.skip_channels = skip_channels
         self.condition_channels = condition_channels
+        self.use_skip_connection = use_skip_connection
 
         self.receptive_field = WaveNet.calculate_receptive_field(
             self.filter_width, self.dilations)
@@ -146,7 +148,7 @@ class WaveNet(object):
 
             # We skip connections from the outputs of each layer, adding them
             # all up here.
-            total = sum(outputs)
+            total = sum(outputs) if self.use_skip_connection else outputs[-1]
             transformed1 = tf.nn.relu(total)
             conv1 = tf.nn.conv1d(transformed1, w1, stride=1, padding="SAME")
             if self.use_biases:

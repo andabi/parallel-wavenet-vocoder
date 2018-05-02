@@ -135,7 +135,7 @@ logistic/lj:
     data_path: '/data/public/rw/LJSpeech-1.0_processed/*.wav'
   generate:
     data_path: '/data/public/rw/LJSpeech-1.0_processed/*.wav'
-l/large:
+logistic/large:
   signal:
       max_length: 8000
   model:
@@ -146,7 +146,7 @@ l/large:
   train:
     batch_size: 8
     num_gpu: 4
-l/large_tran:
+logistic/large_tran:
   signal:
       max_length: 8000
   model:
@@ -158,3 +158,10 @@ l/large_tran:
   train:
     batch_size: 8
     num_gpu: 4
+logistic/no_skip:
+  model:
+    n_iaf: 4
+    use_skip_connection: False
+  train:
+    batch_size: 4
+    num_gpu: 8
