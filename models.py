@@ -69,8 +69,8 @@ class IAFVocoder(ModelDesc):
 
         # option1) Upsample melspec to fit to shape of waveform. (n, t_mel, n_mel) => (n, t, h)
         if hp.model.cond_upsample_method == 'transposed_conv':
-            stride1, stride2 = 10, 8
-            assert (stride1 * stride2 == hp.signal.hop_length)
+            stride1, stride2, stride3 = 4, 4, 5
+            assert (stride1 * stride2 * stride3 == hp.signal.hop_length)
             w1 = tf.get_variable('transposed_conv_1_weights',
                                  shape=(1, stride1, hp.model.condition_channels, hp.signal.n_mels))
             cond = tf.expand_dims(melspec, 1)
@@ -79,10 +79,15 @@ class IAFVocoder(ModelDesc):
             w2 = tf.get_variable('transposed_conv_2_weights',
                                  shape=(1, stride2, hp.model.condition_channels, hp.model.condition_channels))
             cond = tf.nn.conv2d_transpose(cond, w2, output_shape=(
-                self.batch_size, 1, hp.signal.hop_length * self.t_mel, hp.model.condition_channels),
-                                          strides=[1, 1, stride2, 1])  # (n, t, h)
+                self.batch_size, 1, stride1 * stride2 * self.t_mel, hp.model.condition_channels),
+                                          strides=[1, 1, stride2, 1])
+            w3 = tf.get_variable('transposed_conv_3_weights',
+                                 shape=(1, stride3, hp.model.condition_channels, hp.model.condition_channels))
+            cond = tf.nn.conv2d_transpose(cond, w3, output_shape=(
+                self.batch_size, 1, stride1 * stride2 * stride3 * self.t_mel, hp.model.condition_channels),
+                                          strides=[1, 1, stride3, 1])
             cond = tf.squeeze(cond, 1)
-            cond = cond[:, hp.signal.hop_length // 2: -hp.signal.hop_length // 2, :]
+            cond = cond[:, hp.signal.hop_length // 2: -hp.signal.hop_length // 2, :]  # (n, t, h)
 
         # option2) just copy value and expand dim of time step
         elif hp.model.cond_upsample_method == 'repeat':
@@ -126,7 +131,7 @@ class IAFVocoder(ModelDesc):
                     use_skip_connection=hp.model.use_skip_connection,
                     is_training=is_training,
                     name='scalar',
-                    # normalize='bn'
+                    normalize=hp.model.normalize
                 )
                 shifter = WaveNet(
                     batch_size=self.batch_size,
@@ -141,7 +146,7 @@ class IAFVocoder(ModelDesc):
                     use_skip_connection=hp.model.use_skip_connection,
                     is_training=is_training,
                     name='shifter',
-                    # normalize='bn',
+                    normalize=hp.model.normalize,
                 )
                 iaf = LinearIAFLayer(batch_size=hp.train.batch_size, scaler=scaler, shifter=shifter)
                 input = iaf(input, condition if hp.model.condition_all_iaf or i is 0 else None)  # (n, t, h)
