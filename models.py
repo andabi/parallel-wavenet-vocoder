@@ -6,7 +6,7 @@ from tensorpack.graph_builder.model_desc import ModelDesc, InputDesc
 from tensorpack.tfutils.scope_utils import auto_reuse_variable_scope
 
 from hparam import hparam as hp
-from modules import LinearIAFLayer, WaveNet, discretized_mol_loss, l2_loss, instance_normalization, power_loss, l1_loss
+from modules import LinearIAFLayer, WaveNet, discretized_mol_loss, l2_loss, normalize, power_loss, l1_loss
 from tensorpack.tfutils import get_current_tower_context
 
 
@@ -104,48 +104,51 @@ class IAFVocoder(ModelDesc):
     def __call__(self, wav, melspec, is_training):
         with tf.variable_scope('cond'):
             condition = self._upsample_cond(melspec)  # (n, t, h)
-            if hp.model.normalize:
+            if hp.model.normalize and not hp.model.no_norm_cond:
                 with tf.variable_scope('normalize'):
-                    condition = instance_normalization(condition)
+                    condition = normalize(condition, method=hp.model.normalize, is_training=is_training)
 
         # Sample from logistic dist.
         logstic_dist = tf.contrib.distributions.Logistic(loc=0., scale=1.)
         input = logstic_dist.sample([self.batch_size, self.length, 1])
         for i in range(hp.model.n_iaf):
             with tf.variable_scope('iaf{}'.format(i)):
-                with tf.variable_scope('scaler'):
-                    scaler = WaveNet(
-                        batch_size=self.batch_size,
-                        dilations=hp.model.dilations,
-                        filter_width=hp.model.filter_width,
-                        residual_channels=hp.model.residual_channels,
-                        dilation_channels=hp.model.dilation_channels,
-                        quantization_channels=1,
-                        skip_channels=hp.model.skip_channels,
-                        use_biases=hp.model.use_biases,
-                        condition_channels=hp.model.condition_channels,
-                        use_skip_connection=hp.model.use_skip_connection)
-                with tf.variable_scope('shifter'):
-                    shifter = WaveNet(
-                        batch_size=self.batch_size,
-                        dilations=hp.model.dilations,
-                        filter_width=hp.model.filter_width,
-                        residual_channels=hp.model.residual_channels,
-                        dilation_channels=hp.model.dilation_channels,
-                        quantization_channels=1,
-                        skip_channels=hp.model.skip_channels,
-                        use_biases=hp.model.use_biases,
-                        condition_channels=hp.model.condition_channels,
-                        use_skip_connection=hp.model.use_skip_connection)
+                scaler = WaveNet(
+                    batch_size=self.batch_size,
+                    dilations=hp.model.dilations,
+                    filter_width=hp.model.filter_width,
+                    residual_channels=hp.model.residual_channels,
+                    dilation_channels=hp.model.dilation_channels,
+                    quantization_channels=1,
+                    skip_channels=hp.model.skip_channels,
+                    use_biases=hp.model.use_biases,
+                    condition_channels=hp.model.condition_channels,
+                    use_skip_connection=hp.model.use_skip_connection,
+                    is_training=is_training,
+                    name='scalar',
+                    # normalize='bn'
+                )
+                shifter = WaveNet(
+                    batch_size=self.batch_size,
+                    dilations=hp.model.dilations,
+                    filter_width=hp.model.filter_width,
+                    residual_channels=hp.model.residual_channels,
+                    dilation_channels=hp.model.dilation_channels,
+                    quantization_channels=1,
+                    skip_channels=hp.model.skip_channels,
+                    use_biases=hp.model.use_biases,
+                    condition_channels=hp.model.condition_channels,
+                    use_skip_connection=hp.model.use_skip_connection,
+                    is_training=is_training,
+                    name='shifter',
+                    # normalize='bn',
+                )
                 iaf = LinearIAFLayer(batch_size=hp.train.batch_size, scaler=scaler, shifter=shifter)
                 input = iaf(input, condition if hp.model.condition_all_iaf or i is 0 else None)  # (n, t, h)
 
             # normalization
             with tf.variable_scope('normalize{}'.format(i)):
-                if hp.model.normalize == 'bn':
-                    input = tf.layers.batch_normalization(input, training=is_training)
-                elif hp.model.normalize == 'in':
-                    input = instance_normalization(input)
+                input = normalize(input, method=hp.model.normalize, is_training=is_training)
 
         # if hp.train.loss != 'mol':
         return input
