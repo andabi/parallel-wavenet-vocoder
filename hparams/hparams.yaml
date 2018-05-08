@@ -158,7 +158,7 @@ logistic/large_tran:
       cond_upsample_method: 'transposed_conv'
   train:
     batch_size: 8
-    num_gpu: 4
+    num_gpu: 1
 logistic/no_skip:
   model:
     n_iaf: 4
@@ -192,7 +192,7 @@ logistic/no_skip_tran:
     use_skip_connection: False
     cond_upsample_method: 'transposed_conv'
   train:
-    batch_size: 4
+    batch_size: 2
     num_gpu: 8
 logistic/no_skip_tran_power:
   model:
@@ -221,7 +221,7 @@ logistic/no_skip_power:
     n_iaf: 6
     use_skip_connection: False
   train:
-    batch_size: 4
+    batch_size: 2
     num_gpu: 4
     weight_power_loss: 0.0005
 logistic/no_norm_cond:
@@ -238,3 +238,60 @@ logistic/norm_more:
   train:
     batch_size: 4
     num_gpu: 8
+logistic/default:
+  model:
+    residual_channels: 256
+    dilation_channels: 256
+    n_iaf: 4
+    normalize: 'bn'
+    use_skip_connection: False
+  train:
+    batch_size: 1
+    num_gpu: 8
+logistic/hop256:
+  signal:
+    win_length: 1024
+    hop_length: 256
+    n_fft: 1024
+  model:
+    residual_channels: 256
+    dilation_channels: 256
+    n_iaf: 4
+    normalize: 'bn'
+    use_skip_connection: False
+  train:
+    batch_size: 1
+    num_gpu: 8
+logistic/cond256:
+  model:
+    n_iaf: 4
+    condition_channels: 256
+    use_skip_connection: False
+  train:
+    batch_size: 2
+    num_gpu: 8
+logistic/beta99:
+  model:
+    n_iaf: 4
+    use_skip_connection: False
+  train:
+    batch_size: 4
+    num_gpu: 4
+    adam_beta2: 0.99
+---
+logistic/default_repeat:
+  train:
+    batch_size: 1
+    num_gpu: 4
+logistic/default_tran:
+  model:
+    cond_upsample_method: 'transposed_conv'
+  train:
+    batch_size: 1
+    num_gpu: 4
+logistic/default_norm:
+  model:
+    cond_upsample_method: 'transposed_conv'
+  train:
+    batch_size: 1
+    num_gpu: 1

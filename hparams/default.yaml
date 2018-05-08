@@ -1,8 +1,6 @@
 ---
 signal:
     sr: 16000
-    frame_shift: 0.005
-    frame_length:  0.025
     win_length: 400
     hop_length: 80
     n_fft: 512
@@ -11,31 +9,40 @@ signal:
     min_db: -55
     max_length: 32000
 model:
-    dilations: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
-#                  1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+    dilations: [
+                 [1, 2, 4, 8, 16, 32, 64, 128, 256, 512],
+                 [1, 2, 4, 8, 16, 32, 64, 128, 256, 512],
+                 [1, 2, 4, 8, 16, 32, 64, 128, 256, 512],
+                 [
+                   1, 2, 4, 8, 16, 32, 64, 128, 256, 512,
+                   1, 2, 4, 8, 16, 32, 64, 128, 256, 512,
+                   1, 2, 4, 8, 16, 32, 64, 128, 256, 512
+                 ]
+               ]
     filter_width: 2
-    residual_channels: 32
-    dilation_channels: 32
+    residual_channels: 128
+    dilation_channels: 128
     skip_channels: 256
-    condition_channels: 32
+    condition_channels: 128
     use_biases: True
     n_iaf: 4
     normalize: 'in'
     condition_all_iaf: True
     cond_upsample_method: 'repeat'
-    use_skip_connection: True
+    use_skip_connection: False
     no_norm_cond: False
 train:
     data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
-    batch_size: 8
+    batch_size: 2
+    num_gpu: 8
     lr: 0.0002
     n_mix: 10
     weight_power_loss: 0.
     num_epochs: 100000
     steps_per_epoch: 100
     save_per_epoch: 100
-    num_gpu: 8
     loss: 'l1'
+    adam_beta2: 0.999
 generate:
     length: 64000
     data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
