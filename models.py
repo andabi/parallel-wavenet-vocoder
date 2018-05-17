@@ -3,13 +3,14 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+
+import numpy as np
 import tensorflow as tf
 from tensorpack.graph_builder.model_desc import ModelDesc, InputDesc
+from tensorpack.tfutils import get_current_tower_context
 
 from hparam import hparam as hp
-from modules import LinearIAFLayer, WaveNet, discretized_mol_loss, l2_loss, normalize, power_loss, l1_loss
-from tensorpack.tfutils import get_current_tower_context
-import numpy as np
+from modules import LinearIAFLayer, WaveNet, normalize, power_loss, l1_loss
 
 
 class IAFVocoder(ModelDesc):
@@ -22,94 +23,15 @@ class IAFVocoder(ModelDesc):
         self.t_mel = 1 + length // hp.signal.hop_length
         self.length = length
 
-    def _get_inputs(self):
-        return [InputDesc(tf.float32, (None, self.length, 1), 'wav'),  # (n, t)
-                InputDesc(tf.float32, (None, self.t_mel, hp.signal.n_mels), 'melspec')]  # (n, t_mel, n_mel)
-
-    def _build_graph(self, inputs):
-        wav, melspec = inputs
-        is_training = get_current_tower_context().is_training
-
-        # if hp.train.loss == 'mol':
-        #     mu, stdv, log_pi = self(*inputs, is_training=is_training)
-        #     tf.summary.histogram('mu', mu)
-        #     tf.summary.histogram('var', stdv)
-        #     tf.summary.histogram('pi', tf.exp(log_pi))
-        #     l_loss = discretized_mol_loss(mu, stdv, log_pi, y=wav, n_mix=hp.train.n_mix)
-        #     out = self.generate(mu, log_pi)
-        # else:
-        out = self(*inputs, is_training=is_training)
-        out = tf.identity(out, name='pred_wav')
-        l_loss = l1_loss(out=out, y=wav)
-
-        with tf.name_scope('loss'):
-            p_loss = power_loss(out=tf.squeeze(out, -1), y=tf.squeeze(wav, -1),
-                                win_length=hp.signal.win_length, hop_length=hp.signal.hop_length)
-            tf.summary.scalar('likelihood', l_loss)
-            self.cost = l_loss + hp.train.weight_power_loss * p_loss
-            if hp.train.weight_power_loss > 0:
-                tf.summary.scalar('power', p_loss)
-            tf.summary.scalar('total_loss', self.cost)
-
-        if hp.train.use_ema:
-            var_class = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'iaf_vocoder')
-            ema = tf.train.ExponentialMovingAverage(decay=0.998)
-            ema_op = ema.apply(var_class)
-            tf.add_to_collection(tf.GraphKeys.UPDATE_OPS, ema_op)
-
-        # build graph for generation phase.
-        if not is_training:
-            tf.summary.histogram('hist/wav', wav)
-            tf.summary.histogram('hist/out', out)
-            tf.summary.audio('audio/pred', out, hp.signal.sr)
-            tf.summary.audio('audio/gt', wav, hp.signal.sr)
-
-    def _get_optimizer(self):
-        lr = tf.get_variable('learning_rate', initializer=hp.train.lr, trainable=False)
-        return tf.train.AdamOptimizer(lr, beta2=hp.train.adam_beta2)
-
-    def _upsample_cond(self, melspec, is_training, strides):
-        assert(np.prod(np.array(strides)) == hp.signal.hop_length)
-
-        # option1) Upsample melspec to fit to shape of waveform. (n, t_mel, n_mel) => (n, t, h)
-        if hp.model.cond_upsample_method == 'transposed_conv':
-            cond = tf.expand_dims(melspec, 1)
-            length = self.t_mel
-            input_channels = hp.signal.n_mels
-            for i, stride in enumerate(strides):
-                w = tf.get_variable('transposed_conv_{}_weights'.format(i),
-                                     shape=(1, stride, hp.model.condition_channels, input_channels))
-                input_channels = hp.model.condition_channels
-                length *= stride
-                cond = tf.nn.conv2d_transpose(cond, w, output_shape=(
-                    self.batch_size, 1, length, hp.model.condition_channels), strides=[1, 1, stride, 1])
-                # b = tf.get_variable('transposed_conv_{}_biases'.format(i),
-                #                              shape=(1, 1, stride, hp.model.condition_channels), initializer=tf.zeros_initializer)
-                # cond = tf.nn.bias_add(cond, b)
-                cond = tf.nn.relu(cond)
-                cond = normalize(cond, method=hp.model.normalize_cond, is_training=is_training,
-                                 name='normalize_transposed_conv_{}'.format(i))
-            cond = tf.squeeze(cond, 1)
-            cond = cond[:, hp.signal.hop_length // 2: -hp.signal.hop_length // 2, :]  # (n, t, h)
-
-        # option2) just copy value and expand dim of time step
-        elif hp.model.cond_upsample_method == 'repeat':
-            cond = tf.layers.dense(melspec, units=hp.model.condition_channels, activation=tf.nn.relu)
-            cond = tf.reshape(tf.tile(cond, [1, 1, hp.signal.hop_length]),
-                              shape=[-1, self.t_mel * hp.signal.hop_length, hp.model.condition_channels])
-            cond = cond[:, hp.signal.hop_length // 2: -hp.signal.hop_length // 2, :]
-        else:
-            cond = None
-        return cond
-
-    def generate(self, mu, log_pi):
-        argmax = tf.one_hot(tf.argmax(log_pi, axis=-1), hp.train.n_mix)
-        pred = tf.reduce_sum(mu * argmax, axis=-1, name='pred_wav', keepdims=True)
-        return pred
-
     # network
     def __call__(self, wav, melspec, is_training, name='iaf_vocoder'):
-        with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
+
+        if hp.train.use_ema:
+            ema = tf.train.ExponentialMovingAverage(decay=0.998)
+
+        # use_ema = True if hp.train.use_ema and not get_current_tower_context().is_training else False
+
+        with tf.variable_scope(name, reuse=tf.AUTO_REUSE):  #, custom_getter=_ema_getter if use_ema else None):
             with tf.variable_scope('cond'):
                 condition = self._upsample_cond(melspec, is_training=is_training, strides=[4, 4, 5])  # (n, t, h)
                 if hp.model.normalize_cond:
@@ -157,26 +79,77 @@ class IAFVocoder(ModelDesc):
                 # normalization
                 input = normalize(input, method=hp.model.normalize, is_training=is_training, name='normalize{}'.format(i))
 
-            # if hp.train.loss != 'mol':
-            return input
+        if hp.train.use_ema:
+            var_class = tf.trainable_variables('iaf_vocoder')
+            ema_op = ema.apply(var_class)
+            tf.add_to_collection(tf.GraphKeys.UPDATE_OPS, ema_op)
 
-        # parameters of MoL
-        # with tf.variable_scope('mol'):
-        #     n_mix = hp.train.n_mix
-        #     w = tf.get_variable('conv_weights', shape=(1, hp.model.quantization_channels, n_mix * 3))
-        #     out = tf.nn.conv1d(input, w, stride=1, padding='SAME')  # (b, t, h) => (b, t, 3n)
-        #
-        #     # bias for various modals
-        #     bias = tf.get_variable('bias', shape=[n_mix * 3, ],
-        #                            initializer=tf.random_uniform_initializer(minval=-3., maxval=3.))
-        #     out = tf.nn.bias_add(out, bias)
-        #
-        #     mu = out[..., :n_mix]
-        #     mu = tf.nn.tanh(mu)  # (b, t, n)
-        #
-        #     stdv = out[..., n_mix: 2 * n_mix]
-        #     stdv = tf.nn.softplus(stdv)  # (b, t, n)
-        #
-        #     log_pi = out[..., 2 * n_mix: 3 * n_mix]  # (b, t, n)
-        #     log_pi = tf.nn.log_softmax(log_pi)
-        # return mu, stdv, log_pi
+        return input
+
+    def _get_inputs(self):
+        return [InputDesc(tf.float32, (None, self.length, 1), 'wav'),  # (n, t)
+                InputDesc(tf.float32, (None, self.t_mel, hp.signal.n_mels), 'melspec')]  # (n, t_mel, n_mel)
+
+    def _build_graph(self, inputs):
+        wav, melspec = inputs
+        is_training = get_current_tower_context().is_training
+
+        out = self(*inputs, is_training=is_training)
+        out = tf.identity(out, name='pred_wav')
+        l_loss = l1_loss(out=out, y=wav)
+
+        with tf.name_scope('loss'):
+            p_loss = power_loss(out=tf.squeeze(out, -1), y=tf.squeeze(wav, -1),
+                                win_length=hp.signal.win_length, hop_length=hp.signal.hop_length)
+            tf.summary.scalar('likelihood', l_loss)
+            self.cost = l_loss + hp.train.weight_power_loss * p_loss
+            if hp.train.weight_power_loss > 0:
+                tf.summary.scalar('power', p_loss)
+            tf.summary.scalar('total_loss', self.cost)
+
+        # build graph for generation phase.
+        if not is_training:
+            tf.summary.histogram('hist/wav', wav)
+            tf.summary.histogram('hist/out', out)
+            tf.summary.audio('audio/pred', out, hp.signal.sr)
+            tf.summary.audio('audio/gt', wav, hp.signal.sr)
+
+    def _get_optimizer(self):
+        lr = tf.get_variable('learning_rate', initializer=hp.train.lr, trainable=False)
+        return tf.train.AdamOptimizer(lr, beta2=hp.train.adam_beta2)
+
+    def _upsample_cond(self, melspec, is_training, strides):
+        assert(np.prod(np.array(strides)) == hp.signal.hop_length)
+
+        # option1) Upsample melspec to fit to shape of waveform. (n, t_mel, n_mel) => (n, t, h)
+        if hp.model.cond_upsample_method == 'transposed_conv':
+            cond = tf.expand_dims(melspec, 1)
+            length = self.t_mel
+            input_channels = hp.signal.n_mels
+            for i, stride in enumerate(strides):
+                w = tf.get_variable('transposed_conv_{}_weights'.format(i),
+                                     shape=(1, stride, hp.model.condition_channels, input_channels))
+                input_channels = hp.model.condition_channels
+                length *= stride
+                cond = tf.nn.conv2d_transpose(cond, w, output_shape=(
+                    self.batch_size, 1, length, hp.model.condition_channels), strides=[1, 1, stride, 1])
+                cond = tf.nn.relu(cond)
+                cond = normalize(cond, method=hp.model.normalize_cond, is_training=is_training,
+                                 name='normalize_transposed_conv_{}'.format(i))
+            cond = tf.squeeze(cond, 1)
+            cond = cond[:, hp.signal.hop_length // 2: -hp.signal.hop_length // 2, :]  # (n, t, h)
+
+        # option2) just copy value and expand dim of time step
+        elif hp.model.cond_upsample_method == 'repeat':
+            cond = tf.layers.dense(melspec, units=hp.model.condition_channels, activation=tf.nn.relu)
+            cond = tf.reshape(tf.tile(cond, [1, 1, hp.signal.hop_length]),
+                              shape=[-1, self.t_mel * hp.signal.hop_length, hp.model.condition_channels])
+            cond = cond[:, hp.signal.hop_length // 2: -hp.signal.hop_length // 2, :]
+        else:
+            cond = None
+        return cond
+
+    def generate(self, mu, log_pi):
+        argmax = tf.one_hot(tf.argmax(log_pi, axis=-1), hp.train.n_mix)
+        pred = tf.reduce_sum(mu * argmax, axis=-1, name='pred_wav', keepdims=True)
+        return pred
