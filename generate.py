@@ -1,17 +1,14 @@
 # -*- coding: utf-8 -*-
 # !/usr/bin/env python
-
-
-# -*- coding: utf-8 -*-
-# !/usr/bin/env python
-
-
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import tensorflow as tf
 from tensorpack.predict.base import OfflinePredictor
 from tensorpack.predict.config import PredictConfig
 from tensorpack.tfutils.sessinit import SaverRestore
 
-from data_load import DataFlow
+from data_load import Dataset
 from hparam import hparam as hp
 from models import IAFVocoder
 import fire
@@ -38,13 +35,17 @@ def generate(case='default', ckpt=None, gpu=None, debug=False):
     hp.set_hparam_yaml(case)
 
     # dataflow
-    df = DataFlow(hp.generate.data_path, hp.generate.batch_size, length=hp.generate.length)
+
+    # dataset
+    dataset = Dataset(hp.generate.data_path, hp.generate.batch_size, length=hp.generate.length)
 
     # model
     model = IAFVocoder(batch_size=hp.generate.batch_size, length=hp.generate.length)
 
     # samples
-    gt_wav, melspec = df().get_data().next()
+    iterator = dataset().make_one_shot_iterator()
+    with tf.Session() as sess:
+        gt_wav, melspec = sess.run(iterator.get_next())
 
     ckpt = '{}/{}'.format(hp.logdir, ckpt) if ckpt else tf.train.latest_checkpoint(hp.logdir)
     print('{} loaded.'.format(ckpt))

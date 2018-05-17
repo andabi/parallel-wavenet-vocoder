@@ -1,4 +1,4 @@
-test:
+test/default:
   train:
     batch_size: 1
     data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
@@ -7,6 +7,55 @@ test:
   generate:
     data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
     every_n_epoch: 1
+test/tran:
+  model:
+    cond_upsample_method: 'transposed_conv'
+  train:
+    batch_size: 1
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+    steps_per_epoch: 1
+    num_gpu: 1
+  generate:
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+    every_n_epoch: 1
+test/no_norm_iaf_wavenet:
+  model:
+    normalize: ''
+    normalize_cond: 'in'
+    normalize_wavenet: ''
+  train:
+    batch_size: 1
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+    steps_per_epoch: 1
+    num_gpu: 1
+  generate:
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+    every_n_epoch: 1
+test/bn:
+  model:
+    normalize: 'bn'
+    normalize_cond: 'bn'
+    normalize_wavenet: 'bn'
+  train:
+    batch_size: 1
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+    steps_per_epoch: 1
+    num_gpu: 1
+  generate:
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+    every_n_epoch: 1
+test/no_norm_wavenet:
+  model:
+    normalize_wavenet: ''
+  train:
+    batch_size: 1
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+    steps_per_epoch: 1
+    num_gpu: 1
+  generate:
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+    every_n_epoch: 1
+---
 l2/min:
   model:
     dilations: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
@@ -224,13 +273,6 @@ logistic/no_skip_power:
     batch_size: 2
     num_gpu: 4
     weight_power_loss: 0.0005
-logistic/no_norm_cond:
-  model:
-    n_iaf: 4
-    no_norm_cond: True
-  train:
-    batch_size: 4
-    num_gpu: 4
 logistic/norm_more:
   model:
     n_iaf: 4
@@ -289,9 +331,50 @@ logistic/default_tran:
   train:
     batch_size: 1
     num_gpu: 4
-logistic/default_norm:
+logistic/default_tran_norm:
   model:
     cond_upsample_method: 'transposed_conv'
   train:
     batch_size: 1
-    num_gpu: 1
+    num_gpu: 4
+logistic/no_norm_iaf:
+  model:
+    normalize: ''
+    normalize_cond: 'in'
+    normalize_wavenet: 'in'
+  train:
+    batch_size: 1
+    num_gpu: 8
+logistic/no_norm_all:
+  model:
+    normalize: ''
+    normalize_cond: ''
+    normalize_wavenet: ''
+  train:
+    batch_size: 1
+    num_gpu: 8
+logistic/no_norm_tran:
+  model:
+    cond_upsample_method: 'transposed_conv'
+    normalize: ''
+    normalize_cond: ''
+    normalize_wavenet: ''
+  train:
+    batch_size: 1
+    num_gpu: 8
+logistic/no_norm_lj:
+  model:
+    normalize: ''
+    normalize_cond: ''
+    normalize_wavenet: ''
+  train:
+    batch_size: 1
+    num_gpu: 8
+    data_path: '/data/public/rw/LJSpeech-1.0_processed/*.wav'
+  generate:
+    data_path: '/data/public/rw/LJSpeech-1.0_processed/*.wav'
+logistic/power:
+  train:
+    batch_size: 1
+    num_gpu: 4
+    weight_power_loss: 0.0005

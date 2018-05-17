@@ -20,17 +20,18 @@ model:
                  ]
                ]
     filter_width: 2
-    residual_channels: 128
-    dilation_channels: 128
-    skip_channels: 256
-    condition_channels: 128
+    residual_channels: 64
+    dilation_channels: 64
+    skip_channels: 128
+    condition_channels: 80
     use_biases: True
     n_iaf: 4
-    normalize: 'in'
+    normalize: ''
+    normalize_cond: ''
+    normalize_wavenet: ''
     condition_all_iaf: True
     cond_upsample_method: 'repeat'
     use_skip_connection: False
-    no_norm_cond: False
 train:
     data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
     batch_size: 2

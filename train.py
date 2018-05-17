@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # !/usr/bin/env python
-
+from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 
 import os
@@ -11,8 +12,8 @@ from tensorpack.train.interface import TrainConfig
 from tensorpack.train.interface import launch_train_with_config
 from tensorpack.train.trainers import SyncMultiGPUTrainerReplicated, SimpleTrainer
 from tensorpack.utils import logger
-from tensorpack.input_source.input_source import QueueInput
-from data_load import DataFlow
+from tensorpack.input_source.input_source import TFDatasetInput
+from data_load import Dataset
 from hparam import hparam as hp
 from models import IAFVocoder
 import tensorflow as tf
@@ -61,15 +62,15 @@ def train(case='default', ckpt=None, gpu=None, r=False):
     # model
     model = IAFVocoder(batch_size=hp.train.batch_size, length=hp.signal.max_length)
 
-    # dataflow
-    df = DataFlow(hp.train.data_path, hp.train.batch_size, length=hp.signal.max_length)
+    # dataset
+    dataset = Dataset(hp.train.data_path, hp.train.batch_size, length=hp.signal.max_length)
 
     # set logger for event and model saver
     logger.set_logger_dir(hp.logdir)
 
     train_conf = TrainConfig(
         model=model,
-        data=QueueInput(df(n_prefetch=1000, n_thread=4)),
+        data=TFDatasetInput(dataset()),
         callbacks=[
             ModelSaver(checkpoint_dir=hp.logdir),
             RunUpdateOps()  # for batch norm
