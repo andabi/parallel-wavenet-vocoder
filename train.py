@@ -73,7 +73,7 @@ def train(case='default', ckpt=None, gpu=None, r=False):
         data=TFDatasetInput(dataset()),
         callbacks=[
             ModelSaver(checkpoint_dir=hp.logdir),
-            RunUpdateOps()  # for batch norm
+            RunUpdateOps()  # for batch norm, exponential moving average
             # TODO GenerateCallback()
         ],
         max_epoch=hp.train.num_epochs,

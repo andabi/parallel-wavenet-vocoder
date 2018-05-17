@@ -51,6 +51,12 @@ class IAFVocoder(ModelDesc):
                 tf.summary.scalar('power', p_loss)
             tf.summary.scalar('total_loss', self.cost)
 
+        if hp.train.use_ema:
+            var_class = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'iaf_vocoder')
+            ema = tf.train.ExponentialMovingAverage(decay=0.998)
+            ema_op = ema.apply(var_class)
+            tf.add_to_collection(tf.GraphKeys.UPDATE_OPS, ema_op)
+
         # build graph for generation phase.
         if not is_training:
             tf.summary.histogram('hist/wav', wav)

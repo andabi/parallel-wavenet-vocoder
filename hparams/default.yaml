@@ -44,6 +44,7 @@ train:
     save_per_epoch: 100
     loss: 'l1'
     adam_beta2: 0.999
+    hp.train.use_ema: False
 generate:
     length: 64000
     data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
