@@ -11,6 +11,8 @@ import tensorflow as tf
 
 from audio import read_wav, wav2melspec_db, trim_wav, fix_length
 from hparam import hparam as hp
+import math
+import random
 
 
 class Dataset():
@@ -30,11 +32,16 @@ class Dataset():
         return dataset
 
     @staticmethod
-    def _get_wav_and_melspec(wav_file, length):
+    def _get_wav_and_melspec(wav_file, length=None):
         wav = read_wav(wav_file, sr=hp.signal.sr)
         wav = trim_wav(wav)
         if length:
-            wav = fix_length(wav, length)
+            n_clips = math.ceil(len(wav) / length)
+            idx = random.randrange(n_clips)
+            start, end = length * idx, length * (idx + 1)
+            wav = wav[start:end]
+            assert(len(wav) <= length)
+            wav = fix_length(wav, length)  # padding
 
         melspec = wav2melspec_db(wav, sr=hp.signal.sr, n_fft=hp.signal.n_fft, win_length=hp.signal.win_length,
                                  hop_length=hp.signal.hop_length, n_mels=hp.signal.n_mels,
