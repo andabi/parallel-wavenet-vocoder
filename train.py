@@ -19,9 +19,7 @@ from models import IAFVocoder
 import tensorflow as tf
 import fire
 from utils import remove_all_files
-from tensorpack.callbacks.base import Callback
 from tensorpack.callbacks.saver import ModelSaver
-from generate import get_eval_input_names, get_eval_output_names
 
 
 # class GenerateCallback(Callback):

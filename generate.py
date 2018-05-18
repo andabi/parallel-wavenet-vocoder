@@ -3,25 +3,14 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+
+import fire
 import tensorflow as tf
-from tensorpack.predict.base import OfflinePredictor
-from tensorpack.predict.config import PredictConfig
-from tensorpack.tfutils.sessinit import SaverRestore
+from tensorflow.python import debug as tf_debug
 
 from data_load import Dataset
 from hparam import hparam as hp
 from models import IAFVocoder
-import fire
-from tensorflow.python import debug as tf_debug
-from tensorpack.tfutils.sesscreate import SessionCreatorAdapter, NewSessionCreator
-
-
-def get_eval_input_names():
-    return ['wav', 'melspec']
-
-
-def get_eval_output_names():
-    return ['pred_wav', 'audio/pred', 'audio/gt', 'hist/wav', 'hist/out']
 
 
 def generate(case='default', ckpt=None, gpu=None, debug=False):
@@ -34,48 +23,47 @@ def generate(case='default', ckpt=None, gpu=None, debug=False):
 
     hp.set_hparam_yaml(case)
 
-    # dataflow
-
     # dataset
     dataset = Dataset(hp.generate.data_path, hp.generate.batch_size, length=hp.generate.length)
 
     # model
     model = IAFVocoder(batch_size=hp.generate.batch_size, length=hp.generate.length)
 
-    # samples
+    # sample
     iterator = dataset().make_one_shot_iterator()
-    with tf.Session() as sess:
-        gt_wav, melspec = sess.run(iterator.get_next())
+    gt_wav_op, melspec = iterator.get_next()
 
-    ckpt = '{}/{}'.format(hp.logdir, ckpt) if ckpt else tf.train.latest_checkpoint(hp.logdir)
-    print('{} loaded.'.format(ckpt))
+    # feed forward
+    pred_wav_op = model(gt_wav_op, melspec, is_training=False)
+
+    # summaries
+    tf.summary.audio('audio/pred', pred_wav_op, hp.signal.sr)
+    tf.summary.audio('audio/gt', gt_wav_op, hp.signal.sr)
+    # tf.summary.histogram('hist/wav', gt_wav)
+    # tf.summary.histogram('hist/out', pred_wav)
+    summ_op = tf.summary.merge_all()
 
     session_config = tf.ConfigProto(
         device_count={'CPU': 1, 'GPU': 0},
     )
-    sess = NewSessionCreator(config=session_config)
-    # session supporting tensorboard debugging.
-    if debug:
-        sess = SessionCreatorAdapter(sess, lambda sess: tf_debug.TensorBoardDebugWrapperSession(sess, 'localhost:{}'.format(hp.debug_port)))
+    with tf.Session(config=session_config) as sess:
+        if debug:  # session supporting tensorboard debugging.
+            sess = tf_debug.TensorBoardDebugWrapperSession(sess, 'localhost:{}'.format(hp.debug_port))
 
-    # predictor
-    pred_conf = PredictConfig(
-        session_creator=sess,
-        model=model,
-        input_names=get_eval_input_names(),
-        output_names=get_eval_output_names(),
-        session_init=SaverRestore(ckpt) if ckpt else None)
-    generate_audio = OfflinePredictor(pred_conf)
+        # load model
+        ckpt = '{}/{}'.format(hp.logdir, ckpt) if ckpt else tf.train.latest_checkpoint(hp.logdir)
+        sess.run(tf.global_variables_initializer())
+        if ckpt:
+            tf.train.Saver().restore(sess, ckpt)
+            print('Successfully loaded checkpoint {}'.format(ckpt))
+        else:
+            print('No checkpoint found at {}.'.format(hp.logdir))
 
-    # feed forward
-    _, audio_pred, audio_gt, hist_wav, hist_out = generate_audio(gt_wav, melspec)
+        pred_wav, gt_wav, summ = sess.run([pred_wav_op, gt_wav_op, summ_op])
 
-    # write audios in tensorboard
+    # write summaries in tensorboard
     writer = tf.summary.FileWriter(hp.logdir)
-    writer.add_summary(audio_pred)
-    writer.add_summary(audio_gt)
-    writer.add_summary(hist_wav)
-    writer.add_summary(hist_out)
+    writer.add_summary(summ)
     writer.close()
 
     print('Done.')

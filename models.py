@@ -31,7 +31,7 @@ class IAFVocoder(ModelDesc):
 
         # use_ema = True if hp.train.use_ema and not get_current_tower_context().is_training else False
 
-        with tf.variable_scope(name, reuse=tf.AUTO_REUSE):  #, custom_getter=_ema_getter if use_ema else None):
+        with tf.variable_scope(name, reuse=tf.AUTO_REUSE):  # custom_getter=_ema_getter if use_ema else None)
             with tf.variable_scope('cond'):
                 condition = self._upsample_cond(melspec, is_training=is_training, strides=[4, 4, 5])  # (n, t, h)
                 if hp.model.normalize_cond:
@@ -95,7 +95,6 @@ class IAFVocoder(ModelDesc):
         is_training = get_current_tower_context().is_training
 
         out = self(*inputs, is_training=is_training)
-        out = tf.identity(out, name='pred_wav')
         l_loss = l1_loss(out=out, y=wav)
 
         with tf.name_scope('loss'):
@@ -106,13 +105,6 @@ class IAFVocoder(ModelDesc):
             if hp.train.weight_power_loss > 0:
                 tf.summary.scalar('power', p_loss)
             tf.summary.scalar('total_loss', self.cost)
-
-        # build graph for generation phase.
-        if not is_training:
-            tf.summary.histogram('hist/wav', wav)
-            tf.summary.histogram('hist/out', out)
-            tf.summary.audio('audio/pred', out, hp.signal.sr)
-            tf.summary.audio('audio/gt', wav, hp.signal.sr)
 
     def _get_optimizer(self):
         lr = tf.get_variable('learning_rate', initializer=hp.train.lr, trainable=False)
@@ -141,7 +133,9 @@ class IAFVocoder(ModelDesc):
 
         # option2) just copy value and expand dim of time step
         elif hp.model.cond_upsample_method == 'repeat':
-            cond = tf.layers.dense(melspec, units=hp.model.condition_channels, activation=tf.nn.relu)
+            w = tf.get_variable('dense', [1, hp.signal.n_mels, hp.model.condition_channels])
+            cond = tf.nn.conv1d(melspec, w, stride=1, padding="SAME")
+            cond = tf.nn.relu(cond)
             cond = tf.reshape(tf.tile(cond, [1, 1, hp.signal.hop_length]),
                               shape=[-1, self.t_mel * hp.signal.hop_length, hp.model.condition_channels])
             cond = cond[:, hp.signal.hop_length // 2: -hp.signal.hop_length // 2, :]
