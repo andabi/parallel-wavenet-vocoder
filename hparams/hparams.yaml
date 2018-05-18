@@ -30,36 +30,19 @@ test/ema:
     every_n_epoch: 1
 
 ---
-logistic/no_norm_all:
-  model:
-    normalize: ''
-    normalize_cond: ''
-    normalize_wavenet: ''
+ema/default:
   train:
-    batch_size: 1
+    batch_size: 2
     num_gpu: 8
-logistic/no_norm_tran:
-  model:
-    cond_upsample_method: 'transposed_conv'
-    normalize: ''
-    normalize_cond: ''
-    normalize_wavenet: ''
+ema/lj:
   train:
-    batch_size: 1
-    num_gpu: 8
-logistic/no_norm_lj:
-  model:
-    normalize: ''
-    normalize_cond: ''
-    normalize_wavenet: ''
-  train:
-    batch_size: 1
+    batch_size: 2
     num_gpu: 8
     data_path: '/data/public/rw/LJSpeech-1.0_processed/*.wav'
   generate:
     data_path: '/data/public/rw/LJSpeech-1.0_processed/*.wav'
-logistic/power:
+ema/power:
   train:
-    batch_size: 1
-    num_gpu: 4
+    batch_size: 2
+    num_gpu: 8
     weight_power_loss: 0.0005

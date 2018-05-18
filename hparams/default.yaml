@@ -34,6 +34,7 @@ model:
     use_skip_connection: False
 train:
     data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
+    dataset_ratio: 0.9  # the percentage of training data from whole dataset. The rest is used in generation.
     batch_size: 2
     num_gpu: 8
     lr: 0.0002
@@ -44,10 +45,11 @@ train:
     save_per_epoch: 100
     loss: 'l1'
     adam_beta2: 0.999
-    use_ema: False
+    use_ema: True
+    ema_decay: 0.998
 generate:
-    length: 64000
     data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
+    length: 64000
 #    data_path: '/data/public/rw/LJSpeech-1.0_processed/*.wav'
     batch_size: 3
     every_n_epoch: 10

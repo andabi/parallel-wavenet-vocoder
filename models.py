@@ -23,7 +23,7 @@ class IAFVocoder(ModelDesc):
         self.t_mel = 1 + length // hp.signal.hop_length
         self.length = length
         if hp.train.use_ema:
-            self.ema = tf.train.ExponentialMovingAverage(decay=0.998)
+            self.ema = tf.train.ExponentialMovingAverage(decay=hp.train.ema_decay)
 
     # network
     def __call__(self, wav, melspec, is_training, name='iaf_vocoder'):

@@ -40,6 +40,7 @@ def train(case='default', ckpt=None, gpu=None, r=False):
 
     # dataset
     dataset = Dataset(hp.train.data_path, hp.train.batch_size, length=hp.signal.max_length)
+    print('dataset size is {}'.format(len(dataset.wav_files)))
 
     # set logger for event and model saver
     logger.set_logger_dir(hp.logdir)

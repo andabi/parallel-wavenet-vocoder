@@ -8,28 +8,17 @@ import glob
 
 import numpy as np
 import tensorflow as tf
-from tensorpack.dataflow.base import RNGDataFlow
 
 from audio import read_wav, wav2melspec_db, trim_wav, fix_length
 from hparam import hparam as hp
 
 
-class DataFlow(RNGDataFlow):
-    def __init__(self, data_path, batch_size, length):
-        dataset = Dataset(data_path, batch_size, length)
-        self.iterator = dataset().make_one_shot_iterator()
-
-    def __call__(self, n_prefetch=1000, n_thread=1):
-        return self
-
-    def get_data(self):
-        yield self.iterator.get_next()
-
-
 class Dataset():
-    def __init__(self, data_path, batch_size, length):
+    def __init__(self, data_path, batch_size, length, is_training=True):
         self.batch_size = batch_size
-        self.wav_files = glob.glob(data_path)
+        wav_files = glob.glob(data_path)
+        dataset_cut_idx = int(len(wav_files) * hp.train.dataset_ratio)
+        self.wav_files = wav_files[:dataset_cut_idx] if is_training else wav_files[dataset_cut_idx:]
         self.length = length
 
     def __call__(self, n_prefetch=1000, n_thread=32):

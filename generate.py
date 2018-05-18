@@ -24,7 +24,8 @@ def generate(case='default', ckpt=None, gpu=None, debug=False):
     hp.set_hparam_yaml(case)
 
     # dataset
-    dataset = Dataset(hp.generate.data_path, hp.generate.batch_size, length=hp.generate.length)
+    dataset = Dataset(hp.generate.data_path, hp.generate.batch_size, length=hp.generate.length, is_training=False)
+    print('dataset size is {}'.format(len(dataset.wav_files)))
 
     # model
     model = IAFVocoder(batch_size=hp.generate.batch_size, length=hp.generate.length)
