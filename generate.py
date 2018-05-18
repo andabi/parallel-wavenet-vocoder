@@ -45,7 +45,7 @@ def generate(case='default', ckpt=None, gpu=None, debug=False):
     summ_op = tf.summary.merge_all()
 
     session_config = tf.ConfigProto(
-        device_count={'CPU': 1, 'GPU': 0},
+        device_count={'CPU': 1, 'GPU': 1},
     )
     with tf.Session(config=session_config) as sess:
         if debug:  # session supporting tensorboard debugging.

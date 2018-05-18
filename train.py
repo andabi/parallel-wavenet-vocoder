@@ -36,10 +36,10 @@ def train(case='default', ckpt=None, gpu=None, r=False):
         remove_all_files(hp.logdir)
 
     # model
-    model = IAFVocoder(batch_size=hp.train.batch_size, length=hp.signal.max_length)
+    model = IAFVocoder(batch_size=hp.train.batch_size, length=hp.signal.length)
 
     # dataset
-    dataset = Dataset(hp.train.data_path, hp.train.batch_size, length=hp.signal.max_length)
+    dataset = Dataset(hp.train.data_path, hp.train.batch_size, length=hp.signal.length)
     print('dataset size is {}'.format(len(dataset.wav_files)))
 
     # set logger for event and model saver

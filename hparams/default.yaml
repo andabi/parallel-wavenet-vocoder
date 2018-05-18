@@ -7,7 +7,7 @@ signal:
     n_mels: 80
     max_db: 35
     min_db: -55
-    max_length: 32000
+    length: 4000
 model:
     dilations: [
                  [1, 2, 4, 8, 16, 32, 64, 128, 256, 512],
