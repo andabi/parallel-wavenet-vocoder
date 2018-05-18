@@ -1,32 +1,32 @@
 test/default:
   train:
     batch_size: 1
-    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a000*.wav'
     steps_per_epoch: 1
     num_gpu: 1
   generate:
-    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a000*.wav'
     every_n_epoch: 1
 test/tran:
   model:
     cond_upsample_method: 'transposed_conv'
   train:
     batch_size: 1
-    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a000*.wav'
     steps_per_epoch: 1
     num_gpu: 1
   generate:
-    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a000*.wav'
     every_n_epoch: 1
 test/ema:
   train:
     batch_size: 1
-    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a000*.wav'
     steps_per_epoch: 1
     num_gpu: 1
     use_ema: True
   generate:
-    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a0001.wav'
+    data_path: '/data/private/vc/datasets/arctic/slt/arctic_a000*.wav'
     every_n_epoch: 1
 
 ---

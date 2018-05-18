@@ -22,14 +22,10 @@ class IAFVocoder(ModelDesc):
         self.batch_size = batch_size
         self.t_mel = 1 + length // hp.signal.hop_length
         self.length = length
-        if hp.train.use_ema:
-            self.ema = tf.train.ExponentialMovingAverage(decay=hp.train.ema_decay)
 
-    # network
-    def __call__(self, wav, melspec, is_training, name='iaf_vocoder'):
-        # use_ema = True if hp.train.use_ema and not get_current_tower_context().is_training else False
-        with tf.variable_scope(name, reuse=tf.AUTO_REUSE):  # custom_getter=_ema_getter if use_ema else None)
-            with tf.variable_scope('cond', reuse=tf.AUTO_REUSE):
+    def __call__(self, wav, melspec, is_training, name='iaf_vocoder'):  # network
+        with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
+            with tf.variable_scope('cond'):
                 condition = self._upsample_cond(melspec, is_training=is_training, strides=[4, 4, 5])  # (n, t, h)
                 if hp.model.normalize_cond:
                     with tf.variable_scope('normalize'):
@@ -77,6 +73,7 @@ class IAFVocoder(ModelDesc):
                 input = normalize(input, method=hp.model.normalize, is_training=is_training, name='normalize{}'.format(i))
 
         if hp.train.use_ema:
+            self.ema = tf.train.ExponentialMovingAverage(decay=hp.train.ema_decay)
             var_class = tf.trainable_variables('iaf_vocoder')
             ema_op = self.ema.apply(var_class)
             tf.add_to_collection(tf.GraphKeys.UPDATE_OPS, ema_op)
@@ -92,16 +89,17 @@ class IAFVocoder(ModelDesc):
         is_training = get_current_tower_context().is_training
 
         out = self(*inputs, is_training=is_training)
-        l_loss = l1_loss(out=out, y=wav)
 
-        with tf.name_scope('loss'):
-            p_loss = power_loss(out=tf.squeeze(out, -1), y=tf.squeeze(wav, -1),
-                                win_length=hp.signal.win_length, hop_length=hp.signal.hop_length)
-            tf.summary.scalar('likelihood', l_loss)
-            self.cost = l_loss + hp.train.weight_power_loss * p_loss
-            if hp.train.weight_power_loss > 0:
-                tf.summary.scalar('power', p_loss)
-            tf.summary.scalar('total_loss', self.cost)
+        if is_training:
+            with tf.name_scope('loss'):
+                l_loss = l1_loss(out=out, y=wav)
+                p_loss = power_loss(out=tf.squeeze(out, -1), y=tf.squeeze(wav, -1),
+                                    win_length=hp.signal.win_length, hop_length=hp.signal.hop_length)
+                tf.summary.scalar('likelihood', l_loss)
+                self.cost = l_loss + hp.train.weight_power_loss * p_loss
+                if hp.train.weight_power_loss > 0:
+                    tf.summary.scalar('power', p_loss)
+                tf.summary.scalar('total_loss', self.cost)
 
     def _get_optimizer(self):
         lr = tf.get_variable('learning_rate', initializer=hp.train.lr, trainable=False)
