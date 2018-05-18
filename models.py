@@ -22,15 +22,12 @@ class IAFVocoder(ModelDesc):
         self.batch_size = batch_size
         self.t_mel = 1 + length // hp.signal.hop_length
         self.length = length
+        if hp.train.use_ema:
+            self.ema = tf.train.ExponentialMovingAverage(decay=0.998)
 
     # network
     def __call__(self, wav, melspec, is_training, name='iaf_vocoder'):
-
-        if hp.train.use_ema:
-            ema = tf.train.ExponentialMovingAverage(decay=0.998)
-
         # use_ema = True if hp.train.use_ema and not get_current_tower_context().is_training else False
-
         with tf.variable_scope(name, reuse=tf.AUTO_REUSE):  # custom_getter=_ema_getter if use_ema else None)
             with tf.variable_scope('cond'):
                 condition = self._upsample_cond(melspec, is_training=is_training, strides=[4, 4, 5])  # (n, t, h)
@@ -81,7 +78,7 @@ class IAFVocoder(ModelDesc):
 
         if hp.train.use_ema:
             var_class = tf.trainable_variables('iaf_vocoder')
-            ema_op = ema.apply(var_class)
+            ema_op = self.ema.apply(var_class)
             tf.add_to_collection(tf.GraphKeys.UPDATE_OPS, ema_op)
 
         return input

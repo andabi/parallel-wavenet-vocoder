@@ -22,28 +22,6 @@ from utils import remove_all_files
 from tensorpack.callbacks.saver import ModelSaver
 
 
-# class GenerateCallback(Callback):
-#     def _setup_graph(self):
-#         self.generator = self.trainer.get_predictor(
-#             get_eval_input_names(),
-#             get_eval_output_names())
-#         self.df = DataFlow(hp.generate.data_path, hp.generate.batch_size)
-#         self.writer = tf.summary.FileWriter(hp.logdir)
-#
-#     def _trigger_epoch(self):
-#         if self.epoch_num % hp.generate.every_n_epoch == 0:
-#             gt_wav, melspec = self.df().get_data().next()
-#             _, audio_pred, audio_gt = self.generator(gt_wav, melspec)
-#
-#             # write audios in tensorboard
-#             self.writer.add_summary(audio_pred)
-#             self.writer.add_summary(audio_gt)
-#             self.writer.flush()
-#
-#     def _after_train(self):
-#         self.writer.close()
-
-
 def train(case='default', ckpt=None, gpu=None, r=False):
     '''
     :param case: experiment case name
@@ -95,3 +73,25 @@ def train(case='default', ckpt=None, gpu=None, r=False):
 
 if __name__ == '__main__':
     fire.Fire(train)
+
+
+# class GenerateCallback(Callback):
+#     def _setup_graph(self):
+#         self.generator = self.trainer.get_predictor(
+#             get_eval_input_names(),
+#             get_eval_output_names())
+#         self.df = DataFlow(hp.generate.data_path, hp.generate.batch_size)
+#         self.writer = tf.summary.FileWriter(hp.logdir)
+#
+#     def _trigger_epoch(self):
+#         if self.epoch_num % hp.generate.every_n_epoch == 0:
+#             gt_wav, melspec = self.df().get_data().next()
+#             _, audio_pred, audio_gt = self.generator(gt_wav, melspec)
+#
+#             # write audios in tensorboard
+#             self.writer.add_summary(audio_pred)
+#             self.writer.add_summary(audio_gt)
+#             self.writer.flush()
+#
+#     def _after_train(self):
+#         self.writer.close()

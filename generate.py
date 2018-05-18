@@ -54,7 +54,12 @@ def generate(case='default', ckpt=None, gpu=None, debug=False):
         ckpt = '{}/{}'.format(hp.logdir, ckpt) if ckpt else tf.train.latest_checkpoint(hp.logdir)
         sess.run(tf.global_variables_initializer())
         if ckpt:
-            tf.train.Saver().restore(sess, ckpt)
+            var_list = None
+            if hp.train.use_ema:
+                var_list = {}
+                for v in tf.trainable_variables('iaf_vocoder'):
+                    var_list[model.ema.average_name(v)] = v
+            tf.train.Saver(var_list=var_list).restore(sess, ckpt)
             print('Successfully loaded checkpoint {}'.format(ckpt))
         else:
             print('No checkpoint found at {}.'.format(hp.logdir))
@@ -67,7 +72,6 @@ def generate(case='default', ckpt=None, gpu=None, debug=False):
     writer.close()
 
     print('Done.')
-
 
 if __name__ == '__main__':
     fire.Fire(generate)
