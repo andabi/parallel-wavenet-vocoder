@@ -22,21 +22,22 @@ class Dataset():
         dataset_cut_idx = int(len(wav_files) * hp.train.dataset_ratio)
         self.wav_files = wav_files[:dataset_cut_idx] if is_training else wav_files[dataset_cut_idx:]
         self.length = length
+        self.is_training = is_training
 
     def __call__(self, n_prefetch=1000, n_thread=32):
         dataset = tf.data.Dataset.from_tensor_slices(self.wav_files)
         dataset = dataset.map(
-            lambda file: tf.py_func(self._get_wav_and_melspec, [file, self.length], [tf.float32, tf.float32]),
+            lambda file: tf.py_func(self._get_wav_and_melspec, [file, self.length, self.is_training], [tf.float32, tf.float32]),
             num_parallel_calls=n_thread)
         dataset = dataset.repeat().batch(self.batch_size).prefetch(n_prefetch)
         return dataset
 
     @staticmethod
-    def _get_wav_and_melspec(wav_file, length=None):
+    def _get_wav_and_melspec(wav_file, length=None, is_training=True):
         wav = read_wav(wav_file, sr=hp.signal.sr)
         wav = trim_wav(wav)
         if length:
-            n_clips = math.ceil(len(wav) / length)
+            n_clips = math.ceil(len(wav) / length) if is_training else 1
             idx = random.randrange(n_clips)
             start, end = length * idx, length * (idx + 1)
             wav = wav[start:end]
