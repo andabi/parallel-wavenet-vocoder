@@ -29,7 +29,7 @@ class IAFVocoder(ModelDesc):
     def __call__(self, wav, melspec, is_training, name='iaf_vocoder'):
         # use_ema = True if hp.train.use_ema and not get_current_tower_context().is_training else False
         with tf.variable_scope(name, reuse=tf.AUTO_REUSE):  # custom_getter=_ema_getter if use_ema else None)
-            with tf.variable_scope('cond'):
+            with tf.variable_scope('cond', reuse=tf.AUTO_REUSE):
                 condition = self._upsample_cond(melspec, is_training=is_training, strides=[4, 4, 5])  # (n, t, h)
                 if hp.model.normalize_cond:
                     with tf.variable_scope('normalize'):

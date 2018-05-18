@@ -32,17 +32,17 @@ test/ema:
 ---
 ema/default:
   train:
-    batch_size: 2
+    batch_size: 1
     num_gpu: 8
 ema/lj:
   train:
-    batch_size: 2
+    batch_size: 1
     num_gpu: 8
     data_path: '/data/public/rw/LJSpeech-1.0_processed/*.wav'
   generate:
     data_path: '/data/public/rw/LJSpeech-1.0_processed/*.wav'
 ema/power:
   train:
-    batch_size: 2
+    batch_size: 1
     num_gpu: 8
     weight_power_loss: 0.0005
