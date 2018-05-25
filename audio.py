@@ -20,28 +20,6 @@ def write_wav(wav, sr, path, format='wav', subtype='PCM_16'):
     sf.write(path, wav, sr, format=format, subtype=subtype)
 
 
-def read_mfcc(prefix):
-    filename = '{}.mfcc.npy'.format(prefix)
-    mfcc = np.load(filename)
-    return mfcc
-
-
-def write_mfcc(prefix, mfcc):
-    filename = '{}.mfcc'.format(prefix)
-    np.save(filename, mfcc)
-
-
-def read_spectrogram(prefix):
-    filename = '{}.spec.npy'.format(prefix)
-    spec = np.load(filename)
-    return spec
-
-
-def write_spectrogram(prefix, spec):
-    filename = '{}.spec'.format(prefix)
-    np.save(filename, spec)
-
-
 def split_wav(wav, top_db):
     intervals = librosa.effects.split(wav, top_db=top_db)
     wavs = map(lambda i: wav[i[0]: i[1]], intervals)

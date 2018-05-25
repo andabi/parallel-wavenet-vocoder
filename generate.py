@@ -13,18 +13,17 @@ from hparam import hparam as hp
 from models import IAFVocoder
 
 
-def generate(case='default', ckpt=None, gpu=None, debug=False):
+def generate(case='default', ckpt=None, debug=False):
     '''
     :param case: experiment case name
     :param ckpt: checkpoint to load model
-    :param gpu: comma separated list of GPU(s) to use
-    :return: 
+    :param debug: use debug mode session.
     '''
 
     hp.set_hparam_yaml(case)
 
     # dataset
-    dataset = Dataset(hp.generate.data_path, hp.generate.batch_size, length=hp.generate.length, is_training=False)
+    dataset = Dataset(hp.data_path, hp.generate.batch_size, length=hp.generate.length, is_training=False)
     print('dataset size is {}'.format(len(dataset.wav_files)))
 
     # model

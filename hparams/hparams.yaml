@@ -46,3 +46,7 @@ ema/power:
     batch_size: 1
     num_gpu: 8
     weight_power_loss: 0.0005
+ema/len4000:
+  train:
+    batch_size: 8
+    num_gpu: 8

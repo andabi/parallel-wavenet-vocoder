@@ -14,9 +14,6 @@ from modules import LinearIAFLayer, WaveNet, normalize, power_loss, l1_loss
 
 
 class IAFVocoder(ModelDesc):
-    '''
-    wav: [-1, 1]
-    '''
 
     def __init__(self, batch_size, length):
         self.batch_size = batch_size
@@ -42,7 +39,7 @@ class IAFVocoder(ModelDesc):
                         filter_width=hp.model.filter_width,
                         residual_channels=hp.model.residual_channels,
                         dilation_channels=hp.model.dilation_channels,
-                        quantization_channels=1,
+                        quantization_channels=1,  # 1 because the output is real value, not quantized magnitudes.
                         skip_channels=hp.model.skip_channels,
                         use_biases=hp.model.use_biases,
                         condition_channels=hp.model.condition_channels,
@@ -57,7 +54,7 @@ class IAFVocoder(ModelDesc):
                         filter_width=hp.model.filter_width,
                         residual_channels=hp.model.residual_channels,
                         dilation_channels=hp.model.dilation_channels,
-                        quantization_channels=1,
+                        quantization_channels=1,  # 1 because the output is real value, not quantized magnitudes.
                         skip_channels=hp.model.skip_channels,
                         use_biases=hp.model.use_biases,
                         condition_channels=hp.model.condition_channels,
@@ -67,7 +64,7 @@ class IAFVocoder(ModelDesc):
                         normalize=hp.model.normalize_wavenet,
                     )
                     iaf = LinearIAFLayer(batch_size=hp.train.batch_size, scaler=scaler, shifter=shifter)
-                    input = iaf(input, condition if hp.model.condition_all_iaf or i is 0 else None)  # (n, t, h)
+                    input = iaf(input, condition)  # (n, t, h)
 
                 # normalization
                 input = normalize(input, method=hp.model.normalize, is_training=is_training, name='normalize{}'.format(i))
@@ -92,7 +89,7 @@ class IAFVocoder(ModelDesc):
 
         if is_training:
             with tf.name_scope('loss'):
-                l_loss = l1_loss(out=out, y=wav)
+                l_loss = l1_loss(out=out, y=wav)  # L1 loss is identical to MLE loss in this model.
                 p_loss = power_loss(out=tf.squeeze(out, -1), y=tf.squeeze(wav, -1),
                                     win_length=hp.signal.win_length, hop_length=hp.signal.hop_length)
                 tf.summary.scalar('likelihood', l_loss)

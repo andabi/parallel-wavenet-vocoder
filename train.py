@@ -28,7 +28,6 @@ def train(case='default', ckpt=None, gpu=None, r=False):
     :param ckpt: checkpoint to load model
     :param gpu: comma separated list of GPU(s) to use
     :param r: start from the beginning.
-    :return: 
     '''
 
     hp.set_hparam_yaml(case)
@@ -39,7 +38,7 @@ def train(case='default', ckpt=None, gpu=None, r=False):
     model = IAFVocoder(batch_size=hp.train.batch_size, length=hp.signal.length)
 
     # dataset
-    dataset = Dataset(hp.train.data_path, hp.train.batch_size, length=hp.signal.length)
+    dataset = Dataset(hp.data_path, hp.train.batch_size, length=hp.signal.length)
     print('dataset size is {}'.format(len(dataset.wav_files)))
 
     # set logger for event and model saver
@@ -81,7 +80,7 @@ if __name__ == '__main__':
 #         self.generator = self.trainer.get_predictor(
 #             get_eval_input_names(),
 #             get_eval_output_names())
-#         self.df = DataFlow(hp.generate.data_path, hp.generate.batch_size)
+#         self.df = DataFlow(hp.data_path, hp.generate.batch_size)
 #         self.writer = tf.summary.FileWriter(hp.logdir)
 #
 #     def _trigger_epoch(self):

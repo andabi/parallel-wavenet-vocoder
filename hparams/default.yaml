@@ -25,33 +25,28 @@ model:
     skip_channels: 128
     condition_channels: 80
     use_biases: True
+    use_skip_connection: False
     n_iaf: 4
     normalize: ''
     normalize_cond: ''
     normalize_wavenet: ''
-    condition_all_iaf: True
     cond_upsample_method: 'repeat'
-    use_skip_connection: False
 train:
-    data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
     dataset_ratio: 0.9  # the percentage of training data from whole dataset. The rest is used in generation.
-    batch_size: 2
-    num_gpu: 8
+    batch_size: 8
+    num_gpu: 1
     lr: 0.0002
-    n_mix: 10
     weight_power_loss: 0.
     num_epochs: 100000
     steps_per_epoch: 100
     save_per_epoch: 100
-    loss: 'l1'
     adam_beta2: 0.999
     use_ema: True
     ema_decay: 0.998
 generate:
-    data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
     length: 64000
-#    data_path: '/data/public/rw/LJSpeech-1.0_processed/*.wav'
     batch_size: 3
-    every_n_epoch: 10
-logdir_path: '/data/private/iaf-vocoder/logdir'
+    every_n_epoch: 10  # TODO
+data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
+logdir_path: '/data/private/parallel-wavenet-vocoder/logdir'
 debug_port: 1028

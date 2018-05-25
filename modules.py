@@ -43,7 +43,24 @@ def causal_conv(value, filter_, dilation, name='causal_conv'):
         return result
 
 
-# Renovated based on https://github.com/ibab/tensorflow-wavenet
+class LinearIAFLayer(object):
+    def __init__(self, batch_size, scaler, shifter):
+        self.batch_size = batch_size
+        self.scaler = scaler
+        self.shifter = shifter
+
+    # network
+    def __call__(self, input, condition=None):
+        '''
+        input = (n, t, h), condition = (n, t, h)
+        '''
+        scale = self.scaler(input, condition)
+        shift = self.shifter(input, condition)
+        out = input * scale + shift
+        return out
+
+
+# This WaveNet code is renovated based on https://github.com/ibab/tensorflow-wavenet
 class WaveNet(object):
     '''Implements the WaveNet network for generative audio.
 
@@ -148,11 +165,11 @@ class WaveNet(object):
                     conv2 = tf.add(conv2, b2)
         return conv2
 
-    @staticmethod
-    def calculate_receptive_field(filter_width, dilations):
-        receptive_field = (filter_width - 1) * sum(dilations) + 1
-        receptive_field += filter_width - 1
-        return receptive_field
+    # @staticmethod
+    # def calculate_receptive_field(filter_width, dilations):
+    #     receptive_field = (filter_width - 1) * sum(dilations) + 1
+    #     receptive_field += filter_width - 1
+    #     return receptive_field
 
     def _create_causal_layer(self, input_batch):
         '''Creates a single causal convolution layer.
@@ -165,19 +182,15 @@ class WaveNet(object):
             layer = normalize(layer, method=self.normalize, is_training=self.is_training)
         return layer
 
-    def _create_dilation_layer(self, input_batch, dilation, condition_batch):
+    def _create_dilation_layer(self, input_batch, dilation, local_condition):
         '''Creates a single causal dilated convolution layer.
 
         Args:
              input_batch: Input to the dilation layer.
              layer_index: Integer indicating which layer this is.
              dilation: Integer specifying the dilation size.
-             conditioning_batch: Tensor containing the global or local data upon
-                 which the output is to be conditioned upon. Shape:
-                 In global case, shape=[batch size, 1, channels]. The 1 is for the axis
-                 corresponding to time so that the result is broadcast to
-                 all time steps.
-                 In local case, shape=[batch size, n_timesteps, channels].
+             local_condition: The data which each timestep is to be conditioned on. 
+                Shape: [batch size, n_timesteps, channels].
 
         The layer contains a gated filter that connects to dense output
         and to a skip connection:
@@ -200,12 +213,12 @@ class WaveNet(object):
         conv_filter = causal_conv(input_batch, weights_filter, dilation)
         conv_gate = causal_conv(input_batch, weights_gate, dilation)
 
-        if condition_batch is not None:
+        if local_condition:
             weights_cond_filter = tf.get_variable('gc_filter', [1, self.condition_channels, self.dilation_channels])
-            conv_filter = conv_filter + tf.nn.conv1d(condition_batch, weights_cond_filter, stride=1, padding="SAME",
+            conv_filter = conv_filter + tf.nn.conv1d(local_condition, weights_cond_filter, stride=1, padding="SAME",
                                                      name="gc_filter")
             weights_cond_gate = tf.get_variable('gc_gate', [1, self.condition_channels, self.dilation_channels])
-            conv_gate = conv_gate + tf.nn.conv1d(condition_batch, weights_cond_gate, stride=1, padding="SAME",
+            conv_gate = conv_gate + tf.nn.conv1d(local_condition, weights_cond_gate, stride=1, padding="SAME",
                                                  name="gc_gate")
 
         if self.use_biases:
@@ -246,14 +259,14 @@ class WaveNet(object):
         return skip_output, dense_output
 
 
-# TODO normalization refactoring
+# TODO refactoring
 def normalize(input, is_training, method='bn', name='normalize'):
     with tf.variable_scope(name):
         if method == 'bn':
             input = tf.layers.batch_normalization(input, training=is_training)
         elif method == 'in':
             input = instance_normalization(input)
-            # elif hp.model.normalize == 'wn':
+        # elif hp.model.normalize == 'wn':
     return input
 
 
@@ -315,9 +328,6 @@ def instance_normalization(input, epsilon=1e-8):
 #             x = nonlinearity(x)
 #         return x
 #
-#
-#
-#
 # def weight_normalization(input, init_scale=1.):
 #     scale_init = init_scale / tf.sqrt(v_init + 1e-10)
 #     g = tf.get_variable('g', dtype=tf.float32, initializer=scale_init, trainable=True)
@@ -331,14 +341,14 @@ def instance_normalization(input, epsilon=1e-8):
 
 
 def l2_loss(out, y):
-    with tf.variable_scope('l2_loss'):
+    with tf.name_scope('l2_loss'):
         loss = tf.squared_difference(out, y)
         loss = tf.reduce_mean(loss)
     return loss
 
 
 def l1_loss(out, y):
-    with tf.variable_scope('l1_loss'):
+    with tf.name_scope('l1_loss'):
         loss = tf.abs(out - y)
         loss = tf.reduce_mean(loss)
     return loss
@@ -347,10 +357,10 @@ def l1_loss(out, y):
 def discretized_mol_loss(mu, stdv, log_pi, y, n_mix, n_classes=256, weight_const=0.):
     '''
     Selecting the right number of classes (n_classes) is important according to the range of y.
-    :param out: (b, t, h)
-    :param y: (b, t, 1)
-    :param n_mix: 
-    :return: 
+    :param out: Shape=(b, t, h)
+    :param y: Shape: (b, t, 1)
+    :param n_mix: the number of mixtures.
+    :return: loss
     '''
     with tf.variable_scope('discretized_mol_loss'):
         y = tf.tile(y, [1, 1, n_mix])
@@ -403,20 +413,3 @@ def power_loss(out, y, win_length, hop_length):
     loss = tf.squared_difference(power(out), power(y))
     loss = tf.reduce_mean(loss)
     return loss
-
-
-class LinearIAFLayer(object):
-    def __init__(self, batch_size, scaler, shifter):
-        self.batch_size = batch_size
-        self.scaler = scaler
-        self.shifter = shifter
-
-    # network
-    def __call__(self, input, condition=None):
-        '''
-        input = (n, t, h), condition = (n, t, h)
-        '''
-        scale = self.scaler(input, condition)
-        shift = self.shifter(input, condition)
-        out = input * scale + shift
-        return out

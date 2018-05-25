@@ -8,7 +8,7 @@ According to the paper, there are two ways for training the model: 1. directly t
 I've tried the former because it's simpler, but it seems it's harder to optimize the model.
 
 ## Architectures
-* The main architecture consists of a few inverse autoregressive flow(IAF) layer that transform some input probability to different output probability in a autoregressive way.
+* The main architecture consists of a few [inverse autoregressive flow(IAF)](https://arxiv.org/abs/1606.04934) layer that transform some input probability to different output probability in a autoregressive way.
 That means where we assume that input variable z=(z_1, ..., z_n) and output variable x=(x_1, ..., x_n) are multivariate, x_t is affected only by z_1, ..., z_t.
 In other words, Jacobian matrix dx/dz is triangular.
 In short, this model ensures that the output data in a timestep should be generated from only latent values in previous timesteps.
@@ -19,6 +19,7 @@ Therefore, two methods are experimented: 1. use transposed convolution and 2. re
 In my case, the latter was better in quality.
 
 ## Training
+* TBD: loss
 * I kept track of exponential moving average (EMA) of all variables and use them in generation phase.
 
 ## Results
