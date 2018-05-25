@@ -213,7 +213,7 @@ class WaveNet(object):
         conv_filter = causal_conv(input_batch, weights_filter, dilation)
         conv_gate = causal_conv(input_batch, weights_gate, dilation)
 
-        if local_condition:
+        if local_condition is not None:
             weights_cond_filter = tf.get_variable('gc_filter', [1, self.condition_channels, self.dilation_channels])
             conv_filter = conv_filter + tf.nn.conv1d(local_condition, weights_cond_filter, stride=1, padding="SAME",
                                                      name="gc_filter")
