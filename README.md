@@ -23,8 +23,8 @@ As a result, two methods are experimented: 1. use transposed convolution and 2. 
 In my case, the latter was better in quality.
 
 ## Training
-* To optimized the model, I use maximum likelihood estimation(MLE) and this is identical to using L1 loss between prediction and ground truth of raw wave.
-* I kept track of exponential moving average (EMA) of all variables and use them in generation phase.
+* To optimize the model, I use maximum likelihood estimation(MLE) and this is identical to using L1 loss between prediction and ground truth of raw wave.
+* I kept track of exponential moving averages (EMA) of all variables and use them in generation phase.
 * TBD: training graph
 
 ## Results

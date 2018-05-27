@@ -11,7 +11,6 @@ from generate import generate
 def generate_multi(*cases):
 
     for case in cases:
-        # TODO fix: define graph seperately.
         generate(case)
         print('case \'{}\' Done.'.format(case))
 

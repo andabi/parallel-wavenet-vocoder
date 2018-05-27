@@ -48,5 +48,5 @@ generate:
     batch_size: 3
     every_n_epoch: 10  # TODO
 data_path: '/data/private/vc/datasets/arctic/slt/*.wav'
-logdir_path: '/data/private/parallel-wavenet-vocoder/logdir'
+logdir_path: '/data/private/iaf-vocoder/logdir'
 debug_port: 1028
