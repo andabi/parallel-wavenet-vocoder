@@ -4,7 +4,7 @@
 ## Overview
 This is a WaveNet-based vocoder that raw wave is generated from mel-spectrogram in parallel, inspired by [parallel WaveNet]() paper.
 Thanks to the inverse autoregressive flow(IAF) structure, it is possible to generate utterances in parallel.
-According to the paper, there are two ways for training the model: 1. directly train the model by maximum likelihood estimation(MLE) or 2. train the original WaveNet and then optimize the model to have similar output probability, by minimizing KL divergence between them. (a.k.a probability density distillation)
+According to the paper, there are two types of loss for training the model: 1. train the model directly by maximum likelihood estimation(MLE) or 2. train the original WaveNet and then optimize the model to have similar output probability, by minimizing KL divergence between them. (a.k.a probability density distillation)
 I've tried the former because it's simpler, but it seems it's harder to optimize the model.
 TBD: result samples
 
@@ -29,3 +29,8 @@ In my case, the latter was better in quality.
 
 ## Results
 TBD
+
+## Discussion
+* Why optimizing the IAF model harder?
+** Entropy of P(x_t | z_<=t) is larger than that of P(x_t | x_<t). 
+That means the modality of the probability of the dataset could be not clearer in the former case.
