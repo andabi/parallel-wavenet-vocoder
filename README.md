@@ -1,12 +1,11 @@
 # Parallel WaveNet Vocoder
-> Work in progress.
 
 ## Overview
-This is a WaveNet-based vocoder that raw wave is generated from mel-spectrogram in parallel, inspired by [parallel WaveNet]() paper.
-Thanks to the inverse autoregressive flow(IAF) structure, it is possible to generate utterances in parallel.
-According to the paper, there are two types of loss for training the model: 1. train the model directly by maximum likelihood estimation(MLE) or 2. train the original WaveNet and then optimize the model to have similar output probability, by minimizing KL divergence between them. (a.k.a probability density distillation)
-I've tried the former because it's simpler, but it seems it's harder to optimize the model.
-TBD: result samples
+* This is a experimental WaveNet-based vocoder that converts mel-spectrogram to raw wave in parallel, inspired by [parallel WaveNet]() paper.
+* Thanks to the structure of the inverse autoregressive flow(IAF) that is one of non-autoregressive models, we're able to generate sequential data like audio in parallel.
+* Because to optimize the IAF model directly in maximum likelihood estimation(MLE) fails to find appropriate optimum so that generalization is hard, the paper introduces an alternative method a.k.a probability density distillation. 
+  * It trains the original WaveNet beforehand and then optimize the IAF model to model similar output probability by minimizing KL divergence between two probabilities. If we think a bit more, we could conclude that a 'autoregressive' loss is nforced to the IAF model, which is a non-autoregressive model itself. That means the 'autoregressive' constraint is still the key when it comes to training sequence generation models.
+* I've only tried the first one because it's simpler and I was curious about the motivation of to devise the second one. In conclusion, to optimize the IAF model without autoregressive constraint was almost not feasible in my case. Please refer to the output samples [here](https://soundcloud.com/andabi/sets/parallel-wavenet-vocoder).
 
 ## Architectures
 * The main architecture consists of a few [inverse autoregressive flow(IAF)](https://arxiv.org/abs/1606.04934) layer that transform some input probability to other output probability in a inverse autoregressive way.
@@ -27,8 +26,8 @@ In my case, the latter was better in quality.
 * I kept track of exponential moving averages (EMA) of all variables and use them in generation phase.
 * TBD: training graph
 
-## Results
-TBD
+## Samples
+The dataset I tested on is a bunch of audio files uttered by a female speaker(slt) in CMU arctic dataset. Please refer to the output samples [here](https://soundcloud.com/andabi/sets/parallel-wavenet-vocoder).
 
 ## Discussion
 * Why optimizing the IAF model harder?
