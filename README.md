@@ -1,7 +1,7 @@
 # Parallel WaveNet Vocoder
 
 ## Overview
-This is a experimental project that build a WaveNet-based vocoder which converts mel-spectrogram to raw wave in parallel, inspired by [parallel WaveNet]() paper.
+This is a experimental project that build a WaveNet-based vocoder which converts mel-spectrogram to raw wave in parallel, inspired by [parallel WaveNet](https://arxiv.org/abs/1711.10433) paper.
 
 Thanks to the structure of the [inverse autoregressive flow(IAF)](https://arxiv.org/abs/1606.04934), one of non-autoregressive models, we're able to generate sequential data in parallel. Because to optimize the IAF model directly in maximum likelihood estimation(MLE) fails to find appropriate optimum so that generalization is hard, the paper introduces an alternative method a.k.a probability density distillation.
 
