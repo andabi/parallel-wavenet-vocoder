@@ -1,11 +1,12 @@
 # Parallel WaveNet Vocoder
 
 ## Overview
-* This is a experimental WaveNet-based vocoder that converts mel-spectrogram to raw wave in parallel, inspired by [parallel WaveNet]() paper.
-* Thanks to the structure of the inverse autoregressive flow(IAF) that is one of non-autoregressive models, we're able to generate sequential data like audio in parallel.
-* Because to optimize the IAF model directly in maximum likelihood estimation(MLE) fails to find appropriate optimum so that generalization is hard, the paper introduces an alternative method a.k.a probability density distillation. 
-  * It trains the original WaveNet beforehand and then optimize the IAF model to model similar output probability by minimizing KL divergence between two probabilities. If we think a bit more, we could conclude that a 'autoregressive' loss is nforced to the IAF model, which is a non-autoregressive model itself. That means the 'autoregressive' constraint is still the key when it comes to training sequence generation models.
-* I've only tried the first one because it's simpler and I was curious about the motivation of to devise the second one. In conclusion, to optimize the IAF model without autoregressive constraint was almost not feasible in my case. Please refer to the output samples [here](https://soundcloud.com/andabi/sets/parallel-wavenet-vocoder).
+This is a experimental project that build a WaveNet-based vocoder which converts mel-spectrogram to raw wave in parallel, inspired by [parallel WaveNet]() paper.
+
+Thanks to the structure of the inverse autoregressive flow(IAF), one of non-autoregressive models, we're able to generate sequential data in parallel. Because to optimize the IAF model directly in maximum likelihood estimation(MLE) fails to find appropriate optimum so that generalization is hard, the paper introduces an alternative method a.k.a probability density distillation. 
+It trains the original WaveNet beforehand and then optimize the IAF model to model similar output probability by minimizing KL divergence between two probabilities. If we think a bit more, we could conclude that the 'autoregressive' loss is forced to the IAF model, which is a non-autoregressive model itself. That means the 'autoregressive' constraint is still the key when it comes to training sequence generation models.
+
+To optimize the model, I've only tried the simpler one (MLE) because I was curious about the motivation of to devise the alternative one. In conclusion, to optimize the IAF model without autoregressive constraint was almost not feasible in my case. Please refer to the output samples [here](https://soundcloud.com/andabi/sets/parallel-wavenet-vocoder).
 
 ## Architectures
 * The main architecture consists of a few [inverse autoregressive flow(IAF)](https://arxiv.org/abs/1606.04934) layer that transform some input probability to other output probability in a inverse autoregressive way.
